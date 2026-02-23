@@ -19,6 +19,8 @@ dist/
 out/
 *.pdf
 *.typ
+!docs/sample-output/*.pdf
+!docs/sample-output/*.typ
 
 # OS/editor
 .DS_Store

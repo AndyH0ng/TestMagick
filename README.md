@@ -35,7 +35,7 @@ TestMagick는 다음 기능을 제공합니다.
 사전 준비:
 
 1. Python 3.11 이상
-2. Typst CLI (`typst` 명령이 PATH에서 실행 가능해야 함)
+2. Typst CLI
 
 ```bash
 python -m venv .venv
