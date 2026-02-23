@@ -1,0 +1,24 @@
+title: "선형대수 연습문제"
+subtitle: "3주차 문제 세트"
+course: "수학 201"
+date: "2026-02-23"
+problems:
+  - id: "Q1"
+    type: "mcq"
+    question: "다음 중 역행렬이 존재하는 행렬은 무엇인가?"
+    choices:
+      - "행렬식이 0인 행렬"
+      - "행렬식이 2인 행렬"
+      - "서로 같은 두 행이 있는 행렬"
+      - "영벡터 행이 있는 행렬"
+    answer: 2
+    tags: ["행렬식"]
+    source: "교수님 예제"
+    points: 2
+  - id: "Q2"
+    type: "short"
+    question: "랭크-널리티 정리를 서술하시오."
+    answer: "rank(A) + nullity(A) = A의 열 개수"
+    tags: ["랭크", "널리티"]
+    source: "직접 작성"
+    points: 3

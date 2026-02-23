@@ -1,0 +1,53 @@
+#set page(
+  paper: "a4",
+  margin: (x: 20mm, y: 20mm),
+)
+
+#set text(
+  font: ("NanumMyeongjo", "AppleMyungjo", "PCMyungjo", "Libertinus Serif"),
+  size: 11pt,
+)
+
+#align(center)[
+  #set text(size: 18pt, weight: "bold")
+  #text({{ title | typst_string }})
+]
+
+#v(6pt)
+#align(center)[
+  #set text(size: 13pt, weight: "bold")
+  "정답지"
+]
+
+#v(10pt)
+#rect(width: 100%, height: 0.6pt, fill: black)
+#v(12pt)
+
+{% for p in problems %}
+*{{ loop.index }}. [{{ p.id }}]*
+
+{% if p.type == "mcq" %}
+- 정답: {{ p.answer_label }}.
+{% if p.answer_is_typst %}
+{{ p.answer_text }}
+{% else %}
+#text({{ p.answer_text | typst_string }})
+{% endif %}
+{% else %}
+- 정답:
+{% if p.answer_is_typst %}
+{{ p.answer_text }}
+{% else %}
+#text({{ p.answer_text | typst_string }})
+{% endif %}
+{% endif %}
+
+{% if p.source %}
+- 출처: #text({{ p.source | typst_string }})
+{% endif %}
+{% if p.tags_text %}
+- 태그: #text({{ p.tags_text | typst_string }})
+{% endif %}
+
+#v(8pt)
+{% endfor %}
