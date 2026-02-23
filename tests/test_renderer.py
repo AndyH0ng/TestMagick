@@ -26,7 +26,7 @@ def test_render_typst_files(tmp_path: Path) -> None:
     assert rendered.exam_typ.exists()
     assert rendered.answer_typ.exists()
     assert "Select one." in rendered.exam_typ.read_text(encoding="utf-8")
-    assert "정답:" in rendered.answer_typ.read_text(encoding="utf-8")
+    assert "Answer:" in rendered.answer_typ.read_text(encoding="utf-8")
 
 
 def test_render_typst_passthrough_fields(tmp_path: Path) -> None:

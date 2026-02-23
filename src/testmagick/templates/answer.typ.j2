@@ -1,53 +1,112 @@
+// ─── Page Setup ───
 #set page(
   paper: "a4",
-  margin: (x: 20mm, y: 20mm),
+  margin: (top: 25mm, bottom: 22mm, left: 25mm, right: 25mm),
+  footer: context {
+    set text(size: 8.5pt, fill: luma(140))
+    align(center)[Page #counter(page).display() of #counter(page).final().first()]
+  },
 )
 
 #set text(
-  font: ("NanumMyeongjo", "AppleMyungjo", "PCMyungjo", "Libertinus Serif"),
+  font: ("New Computer Modern", "NanumMyeongjo", "AppleMyungjo", "Libertinus Serif"),
   size: 11pt,
+  lang: "ko",
 )
 
-#align(center)[
-  #set text(size: 18pt, weight: "bold")
-  #text({{ title | typst_string }})
-]
+#set par(
+  leading: 0.72em,
+  first-line-indent: 0pt,
+  justify: true,
+)
 
-#v(6pt)
+// ─── Header ───
 #align(center)[
-  #set text(size: 13pt, weight: "bold")
-  "정답지"
+  {% if course %}
+  #text(size: 12pt, weight: "bold")[#{{ course | typst_string }}]
+  #v(2pt)
+  {% endif %}
+  #text(size: 16pt, weight: "bold")[#{{ title | typst_string }}]
+  #v(2pt)
+  #text(size: 12pt, weight: "bold")[Answer Key]
+  {% if date %}
+  #v(2pt)
+  #text(size: 10.5pt)[#{{ date | typst_string }}]
+  {% endif %}
 ]
 
 #v(10pt)
-#rect(width: 100%, height: 0.6pt, fill: black)
-#v(12pt)
+#line(length: 100%, stroke: 0.8pt)
 
+// ─── Answer Summary Table ───
+#v(14pt)
+#align(center)[
+  #text(size: 10.5pt, weight: "bold")[Answer Summary]
+]
+#v(6pt)
+#align(center)[
+  #table(
+    columns: ({% for p in problems %}38pt{% if not loop.last %}, {% endif %}{% endfor %}),
+    align: center + horizon,
+    stroke: 0.4pt + luma(160),
+    inset: 6pt,
+    ..for i in range({{ problems | length }}) {
+      (table.cell(fill: luma(240))[#text(size: 8.5pt, weight: "bold")[#str(i + 1)]],)
+    },
 {% for p in problems %}
-*{{ loop.index }}. [{{ p.id }}]*
+    [#text(size: 9.5pt, weight: "bold")[{{ p.answer_label }}]],
+{% endfor %}
+  )
+]
 
-{% if p.type == "mcq" %}
-- 정답: {{ p.answer_label }}.
+#v(20pt)
+#line(length: 100%, stroke: 0.4pt + luma(180))
+#v(16pt)
+
+// ─── Detailed Solutions ───
+{% for p in problems %}
+#block(
+  width: 100%,
+  breakable: true,
+  above: {% if loop.first %}0pt{% else %}14pt{% endif %},
+  below: 0pt,
+)[
+  #grid(
+    columns: (auto, 1fr, auto),
+    align: horizon,
+    text(weight: "bold", size: 11pt)[{{ loop.index }}. \[{{ p.id }}\]],
+    [],
+    text(size: 9.5pt, weight: "bold")[Answer: {{ p.answer_label }}{% if p.type == "mcq" %}.{% endif %}],
+  )
+
+  #v(4pt)
+  #pad(left: 16pt)[
 {% if p.answer_is_typst %}
 {{ p.answer_text }}
 {% else %}
-#text({{ p.answer_text | typst_string }})
+#{{ p.answer_text | typst_string }}
 {% endif %}
-{% else %}
-- 정답:
-{% if p.answer_is_typst %}
-{{ p.answer_text }}
-{% else %}
-#text({{ p.answer_text | typst_string }})
-{% endif %}
-{% endif %}
+  ]
 
+{% if p.source or p.tags_text %}
+  #v(3pt)
+  #pad(left: 16pt)[
+    #set text(size: 9pt, fill: luma(120), style: "italic")
 {% if p.source %}
-- 출처: #text({{ p.source | typst_string }})
+    Source: #{{ p.source | typst_string }}
+{% endif %}
+{% if p.source and p.tags_text %}
+    #h(8pt)
 {% endif %}
 {% if p.tags_text %}
-- 태그: #text({{ p.tags_text | typst_string }})
+    Tags: #{{ p.tags_text | typst_string }}
+{% endif %}
+  ]
 {% endif %}
 
-#v(8pt)
+{% if not loop.last %}
+  #v(8pt)
+  #line(length: 100%, stroke: 0.3pt + luma(210))
+{% endif %}
+]
 {% endfor %}

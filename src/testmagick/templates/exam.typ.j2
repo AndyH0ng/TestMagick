@@ -1,48 +1,105 @@
+// ─── Page Setup ───
 #set page(
   paper: "a4",
-  margin: (x: 20mm, y: 20mm),
+  margin: (top: 25mm, bottom: 22mm, left: 25mm, right: 25mm),
+  footer: context {
+    set text(size: 8.5pt, fill: luma(140))
+    align(center)[Page #counter(page).display() of #counter(page).final().first()]
+  },
 )
 
 #set text(
-  font: ("NanumMyeongjo", "AppleMyungjo", "PCMyungjo", "Libertinus Serif"),
+  font: ("New Computer Modern", "NanumMyeongjo", "AppleMyungjo", "Libertinus Serif"),
   size: 11pt,
+  lang: "ko",
 )
 
+#set par(
+  leading: 0.72em,
+  first-line-indent: 0pt,
+  justify: true,
+)
+
+// ─── Header ───
 #align(center)[
-  #set text(size: 18pt, weight: "bold")
-  #text({{ title | typst_string }})
+  {% if course %}
+  #text(size: 12pt, weight: "bold")[#{{ course | typst_string }}]
+  #v(2pt)
+  {% endif %}
+  #text(size: 16pt, weight: "bold")[#{{ title | typst_string }}]
+  {% if subtitle %}
+  #v(2pt)
+  #text(size: 10.5pt)[#{{ subtitle | typst_string }}]
+  {% endif %}
+  {% if date %}
+  #v(2pt)
+  #text(size: 10.5pt)[#{{ date | typst_string }}]
+  {% endif %}
 ]
 
-{% if course or date %}
-#v(8pt)
-{% if course %}
-#align(center)[#text({{ course | typst_string }})]
-{% endif %}
-{% if date %}
-#align(center)[#text({{ date | typst_string }})]
-{% endif %}
-{% endif %}
-
 #v(10pt)
-#rect(width: 100%, height: 0.6pt, fill: black)
+#line(length: 100%, stroke: 0.8pt)
+#v(8pt)
+
+// ─── Student Info ───
+#grid(
+  columns: (1fr, 1fr),
+  column-gutter: 20pt,
+  row-gutter: 10pt,
+  [Name: #box(width: 1fr, stroke: (bottom: 0.4pt + luma(160)), outset: (bottom: 2pt))[#h(1fr)]],
+  [Student ID: #box(width: 1fr, stroke: (bottom: 0.4pt + luma(160)), outset: (bottom: 2pt))[#h(1fr)]],
+)
+
 #v(12pt)
 
-{% for p in problems %}
-*{{ loop.index }}. [{{ p.id }}] ({{ "%.2f"|format(p.points) }}점)*
+// ─── Instructions ───
+#block(
+  width: 100%,
+  inset: (x: 10pt, y: 8pt),
+  stroke: 0.4pt + luma(180),
+)[
+  #set text(size: 9.5pt)
+  #text(weight: "bold")[Instructions:]
+  This exam contains {{ problems | length }} question(s) for a total of {{ "%.1f" | format(problems | map(attribute='points') | sum) }} points.
+  Show all work where applicable. Point values are indicated for each problem.
+]
 
+#v(16pt)
+
+// ─── Problems ───
+{% for p in problems %}
+#block(
+  width: 100%,
+  breakable: true,
+  above: {% if loop.first %}0pt{% else %}18pt{% endif %},
+  below: 0pt,
+)[
+  #text(weight: "bold", size: 11pt)[{{ loop.index }}.] #h(2pt)
+  #text(size: 9.5pt)[\({{ "%.1f"|format(p.points) }} pts\)]
+  #v(3pt)
 {% if p.question_is_typst %}
 {{ p.question_typst }}
 {% else %}
-#text({{ p.question | typst_string }})
+#{{ p.question | typst_string }}
 {% endif %}
-
 {% if p.type == "mcq" %}
-{% for choice in p.choices %}
-#block(inset: (left: 10pt))[{{ choice.label }}. {% if choice.is_typst %}{{ choice.value }}{% else %}#text({{ choice.value | typst_string }}){% endif %}]
-{% endfor %}
-{% else %}
-- #text("정답: ___________________________")
-{% endif %}
 
-#v(10pt)
+  #v(5pt)
+  #pad(left: 16pt)[
+{% for choice in p.choices %}
+    #block(spacing: 5pt)[({{ choice.label }}) #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
+{% endfor %}
+  ]
+{% else %}
+
+  #v(8pt)
+  #pad(left: 16pt)[
+    #block(
+      width: 100%,
+      height: 30pt,
+      stroke: (bottom: 0.4pt + luma(200)),
+    )[]
+  ]
+{% endif %}
+]
 {% endfor %}
