@@ -17,7 +17,6 @@ class Problem(BaseModel):
     choices: list[str] | None = None
     choices_typst: list[str] | None = None
     source: str | None = None
-    tags: list[str] = Field(default_factory=list)
     points: float = Field(default=1.0, gt=0)
 
     @field_validator("id")
@@ -45,12 +44,6 @@ class Problem(BaseModel):
             cleaned = value.strip()
             return cleaned or None
         return value
-
-    @field_validator("tags")
-    @classmethod
-    def _normalize_tags(cls, value: list[str]) -> list[str]:
-        cleaned = [tag.strip() for tag in value if tag and tag.strip()]
-        return cleaned
 
     @field_validator("choices", "choices_typst")
     @classmethod

@@ -85,7 +85,6 @@ def _problem_payload(problem: Problem) -> ProblemPayload:
         "answer_is_typst": bool(answer["is_typst"]),
         "answer_label": str(answer["label"]) or _answer_label(problem),
         "source": problem.source,
-        "tags_text": ", ".join(problem.tags),
     }
 
 

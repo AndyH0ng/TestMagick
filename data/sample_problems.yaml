@@ -11,7 +11,6 @@ problems:
       - "$x=-2,-3$"
       - "$x=3,6$"
     answer: 2
-    tags: ["algebra", "quadratic"]
     source: "sample"
     points: 2
 
@@ -21,7 +20,6 @@ problems:
       Read the following code and state what it prints.
       #raw(block: true, lang: "python", "total = 0\nfor i in range(1, 5):\n    total += i\nprint(total)")
     answer: "10"
-    tags: ["python", "loop"]
     source: "sample"
     points: 3
 
@@ -34,7 +32,6 @@ problems:
       - "Encapsulation"
       - "Abstraction leakage"
     answer: 3
-    tags: ["oop"]
     source: "sample"
     points: 2
 
@@ -42,6 +39,5 @@ problems:
     type: "short"
     question: "State one benefit of creating a weekly study schedule."
     answer: "It improves consistency and helps prevent last-minute cramming."
-    tags: ["study-strategy"]
     source: "sample"
     points: 2

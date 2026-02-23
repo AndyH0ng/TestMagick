@@ -88,18 +88,12 @@
 {% endif %}
   ]
 
-{% if p.source or p.tags_text %}
+{% if p.source %}
   #v(3pt)
   #pad(left: 16pt)[
     #set text(size: 9pt, fill: luma(120), style: "italic")
 {% if p.source %}
     Source: #{{ p.source | typst_string }}
-{% endif %}
-{% if p.source and p.tags_text %}
-    #h(8pt)
-{% endif %}
-{% if p.tags_text %}
-    Tags: #{{ p.tags_text | typst_string }}
 {% endif %}
   ]
 {% endif %}
