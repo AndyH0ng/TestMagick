@@ -89,7 +89,9 @@ class Problem(BaseModel):
                 if not self.choices:
                     raise ValueError("텍스트 정답을 쓰려면 일반 choices가 필요합니다.")
                 if answer_text not in self.choices:
-                    raise ValueError("객관식 텍스트 정답은 choices 중 하나와 정확히 일치해야 합니다.")
+                    raise ValueError(
+                        "객관식 텍스트 정답은 choices 중 하나와 정확히 일치해야 합니다."
+                    )
                 self.answer = answer_text
 
             if self.answer_typst:

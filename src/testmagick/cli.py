@@ -17,13 +17,40 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     validate_parser = subparsers.add_parser("validate", help="입력 파일 스키마만 검증합니다.")
-    validate_parser.add_argument("--input", required=True, type=Path, help="YAML/JSON 입력 파일 경로")
+    validate_parser.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="YAML/JSON 입력 파일 경로",
+    )
 
-    build_parser = subparsers.add_parser("build", help=".typ/.pdf 및 선택적으로 .zip 출력 파일을 생성합니다.")
-    build_parser.add_argument("--input", required=True, type=Path, help="YAML/JSON 입력 파일 경로")
-    build_parser.add_argument("--out", type=Path, default=Path("out"), help="출력 디렉터리")
-    build_parser.add_argument("--title", type=str, default=None, help="문서 제목 강제 덮어쓰기")
-    build_parser.add_argument("--no-zip", action="store_true", help="package.zip 생성을 비활성화합니다.")
+    build_parser = subparsers.add_parser(
+        "build",
+        help=".typ/.pdf 및 선택적으로 .zip 출력 파일을 생성합니다.",
+    )
+    build_parser.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="YAML/JSON 입력 파일 경로",
+    )
+    build_parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("out"),
+        help="출력 디렉터리",
+    )
+    build_parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="문서 제목 강제 덮어쓰기",
+    )
+    build_parser.add_argument(
+        "--no-zip",
+        action="store_true",
+        help="package.zip 생성을 비활성화합니다.",
+    )
     return parser
 
 

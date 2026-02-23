@@ -10,6 +10,7 @@ from jinja2 import Environment, PackageLoader
 from testmagick.schema import ExamSet, Problem
 
 OPTION_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+ProblemPayload = dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -70,7 +71,7 @@ def _answer_payload(problem: Problem) -> dict[str, str | bool]:
     return {"label": "TEXT", "value": problem.resolved_answer_text(), "is_typst": False}
 
 
-def _problem_payload(problem: Problem) -> dict[str | Any, str | bool | list[dict[str, str | bool]] | float | Any]:
+def _problem_payload(problem: Problem) -> ProblemPayload:
     answer = _answer_payload(problem)
     return {
         "id": problem.id,
@@ -100,7 +101,11 @@ def _create_environment() -> Environment:
     return env
 
 
-def render_typst_files(exam_set: ExamSet, out_dir: Path, title_override: str | None = None) -> RenderedFiles:
+def render_typst_files(
+    exam_set: ExamSet,
+    out_dir: Path,
+    title_override: str | None = None,
+) -> RenderedFiles:
     out_dir.mkdir(parents=True, exist_ok=True)
     env = _create_environment()
     payload = {

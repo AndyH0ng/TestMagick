@@ -83,7 +83,7 @@ def test_duplicate_problem_id_fails() -> None:
                 ],
             }
         )
-    except Exception as exc:  # pragma: no cover - 예외 타입은 pydantic 내부 구현에 따라 달라질 수 있음
+    except Exception as exc:  # pragma: no cover - pydantic 내부 구현에 따라 달라질 수 있음
         assert "중복된 문제 ID가 있습니다: Q1" in str(exc)
     else:
         raise AssertionError("중복 ID 검증 오류가 발생해야 합니다.")
