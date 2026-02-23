@@ -27,10 +27,6 @@
   #v(2pt)
   {% endif %}
   #text(size: 16pt, weight: "bold")[#{{ title | typst_string }}]
-  {% if subtitle %}
-  #v(2pt)
-  #text(size: 10.5pt)[#{{ subtitle | typst_string }}]
-  {% endif %}
   {% if date %}
   #v(2pt)
   #text(size: 10.5pt)[#{{ date | typst_string }}]
@@ -84,10 +80,13 @@
 {% endif %}
 {% if p.type == "mcq" %}
 
-  #v(5pt)
+  #v(7pt)
   #pad(left: 16pt)[
 {% for choice in p.choices %}
-    #block(spacing: 5pt)[({{ choice.label }}) #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
+    #block(spacing: 7pt)[({{ choice.label }}) #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
+{% if not loop.last %}
+    #v(4pt)
+{% endif %}
 {% endfor %}
   ]
 {% else %}

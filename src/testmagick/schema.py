@@ -159,7 +159,6 @@ class Problem(BaseModel):
 
 class ExamSet(BaseModel):
     title: str = "제목 없는 시험지"
-    subtitle: str | None = None
     course: str | None = None
     date: str | None = None
     problems: list[Problem] = Field(default_factory=list, min_length=1)
@@ -172,7 +171,7 @@ class ExamSet(BaseModel):
             raise ValueError("title은 비워둘 수 없습니다.")
         return cleaned
 
-    @field_validator("subtitle", "course", "date")
+    @field_validator("course", "date")
     @classmethod
     def _strip_optional_text(cls, value: str | None) -> str | None:
         if value is None:

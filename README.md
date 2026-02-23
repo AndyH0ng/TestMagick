@@ -50,7 +50,6 @@ pip install -e ".[dev]"
 참고 예시:
 
 - `./data/sample_problems.yaml`
-- `./data/sample_rich_problems.yaml`
 
 다음을 포함해야 합니다:
 
@@ -75,7 +74,7 @@ pip install -e ".[dev]"
 PDF 생성:
 
 ```bash
-./run build --input data/sample_rich_problems.yaml --out out
+./run build --input data/sample_problems.yaml --out out
 ```
 
 모듈 직접 실행:

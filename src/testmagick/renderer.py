@@ -110,7 +110,6 @@ def render_typst_files(
     env = _create_environment()
     payload = {
         "title": title_override or exam_set.title,
-        "subtitle": exam_set.subtitle,
         "course": exam_set.course,
         "date": exam_set.date,
         "problems": [_problem_payload(p) for p in exam_set.problems],
