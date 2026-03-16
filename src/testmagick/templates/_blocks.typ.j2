@@ -72,8 +72,14 @@
       let _c1_{{ loop.index }} = ({{ e.ctrl_pos[0][0] }}, {{ e.ctrl_pos[0][1] }})
       let _c2_{{ loop.index }} = ({{ e.ctrl_pos[1][0] }}, {{ e.ctrl_pos[1][1] }})
       bezier(_ef(_p.at("{{ e.from }}"), _c1_{{ loop.index }}), _ef(_p.at("{{ e.to }}"), _c2_{{ loop.index }}), _c1_{{ loop.index }}, _c2_{{ loop.index }}, mark: {% if e.bidirectional %}_baw{% elif e.directed %}_aw{% endif %})
+{%- if e.label %}
+      content(((_c1_{{ loop.index }}.at(0) + _c2_{{ loop.index }}.at(0)) / 2, (_c1_{{ loop.index }}.at(1) + _c2_{{ loop.index }}.at(1)) / 2), box(fill: white, inset: 2pt)[#text(size: 8pt)[{{ e.label }}]])
+{%- endif %}
 {%- else %}
       line(_ef(_p.at("{{ e.from }}"), _p.at("{{ e.to }}")), _ef(_p.at("{{ e.to }}"), _p.at("{{ e.from }}")), mark: {% if e.bidirectional %}_baw{% elif e.directed %}_aw{% endif %})
+{%- if e.label %}
+      content(((_p.at("{{ e.from }}").at(0) + _p.at("{{ e.to }}").at(0)) / 2, (_p.at("{{ e.from }}").at(1) + _p.at("{{ e.to }}").at(1)) / 2), box(fill: white, inset: 2pt)[#text(size: 8pt)[{{ e.label }}]])
+{%- endif %}
 {%- endif %}
 {%- endfor %}
 {%- for n in block.nodes %}
