@@ -14,7 +14,14 @@ TestMagick은 **YAML/JSON 파일**을 입력받아 **문제지(exam.pdf)** 와 *
 
 # 검증만 (PDF 생성 없이 스키마 확인)
 ./run validate --input data/my_exam.yaml
+
+# PDF 전처리 (LLM 파이프라인용)
+./run preprocess --input data/textbook.pdf --out out/prep/
+./run preprocess --input data/textbook.pdf --method mixed  # 페이지별 수식 감지
+./run preprocess --input data/textbook.pdf --method markdown  # marker-pdf 변환 (별도 설치 필요)
 ```
+
+> `preprocess` 의존성: `pip install testmagick[preprocess]` (pymupdf) 또는 `testmagick[markdown]` (pymupdf + marker-pdf)
 
 ---
 
@@ -115,7 +122,7 @@ question_blocks:
 
 ### `graph` — 방향 그래프
 
-노드(원)와 엣지(화살표)로 이루어진 방향 그래프를 그립니다.
+노드(원)와 엣지(화살표)로 이루어진 방향 그래프를 그립니다. `label`이 있으면 간선 중점에 표시됩니다.
 
 ```yaml
 question_blocks:
@@ -148,6 +155,7 @@ question_blocks:
         label: "5"               # 간선 레이블 (선택)
 ```
 
+- **노드 id**: 빈 문자열 불가, 공백 자동 제거.
 - **좌표계**: `x`는 오른쪽, `y`는 **위**가 양수 (수학 좌표계). 노드 간격은 `3`~`4` 권장.
 - **이탤릭 라벨** (수학 기호 느낌): `label: "$A$"`. 일반 텍스트: `label: "A"`.
 - **bend 방향**: 화살표의 진행 방향 기준.
@@ -161,11 +169,15 @@ question_blocks:
 ```yaml
 question_blocks:
   - type: table
-    headers: ["구분", "2022년", "2023년"]  # 선택 (없으면 헤더 행 없음)
+    headers: ["구분", "2022년", "2023년"]  # 선택 (없으면 첫 번째 행이 기준 열 수)
     rows:
       - ["매출(억원)", "1,200", "1,500"]
       - ["영업이익(억원)", "150", "200"]
 ```
+
+- `headers` 또는 `rows` 중 최소 하나는 있어야 합니다.
+- 모든 행의 열 수는 `headers`(또는 첫 번째 행)와 일치해야 합니다.
+- 첫 번째 행은 자동으로 회색 배경 + 볼드 처리됩니다.
 
 ---
 
@@ -196,7 +208,19 @@ answer: 2
 ```
 
 - `choices`와 `choices_typst` 둘 다 쓸 경우 길이가 같아야 합니다.
-- 객관식에는 `answer_typst` 사용 불가.
+- 선택지 레이블은 ①②③… 원 안의 숫자로 자동 표시됩니다.
+- 객관식에도 `answer_typst` 사용 가능 — 선택지 번호(①)는 유지되고 해설을 Typst로 작성할 수 있습니다.
+
+```yaml
+# 객관식 + 해설 예시
+- id: "Q1"
+  type: "mcq"
+  question: "다음 중 참인 것은?"
+  choices: ["참", "거짓"]
+  answer: 2
+  answer_typst: |
+    거짓이다. 반례: $x = 0$일 때 성립하지 않는다.
+```
 
 ---
 
@@ -222,7 +246,7 @@ answer_typst: |
 
 ## 소문제 (`subproblems`)
 
-주관식 문제(`type: "short"`)에만 사용 가능합니다. `subproblems`가 있으면 부모 문제에 `answer`/`answer_typst`를 쓰지 않습니다.
+주관식 문제(`type: "short"`)에만 사용 가능합니다. `subproblems`가 있으면 부모 문제에 `answer`/`answer_typst`를 쓰지 않습니다. 소문제는 객관식/주관식 모두 가능하며, 객관식 소문제에도 `answer_typst`로 해설을 작성할 수 있습니다.
 
 ```yaml
 - id: "S1"
