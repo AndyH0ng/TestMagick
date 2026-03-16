@@ -1,0 +1,89 @@
+{% macro render_blocks(blocks) -%}
+{%- for block in blocks %}
+{%- if block.type == "text" %}
+#{{ block.content | typst_string }}
+{%- elif block.type == "typst" %}
+{{ block.content }}
+{%- elif block.type == "formula" %}
+#v(8pt)
+#align(center)[${{ block.content }}$]
+#v(4pt)
+{%- elif block.type == "requirements" %}
+#v(5pt)
+#block(
+  width: 100%,
+  inset: (x: 8pt, y: 5pt),
+  stroke: (left: 2pt + luma(180)),
+  fill: luma(248),
+)[
+  #set text(size: 10pt, style: "italic")
+  #{{ block.content | typst_string }}
+]
+#v(3pt)
+{%- elif block.type == "table" %}
+{%- set col_source = block.headers if block.headers else (block.rows[0] if block.rows else []) %}
+{%- if col_source %}
+#v(8pt)
+#align(center)[
+  #table(
+    columns: ({% for _ in col_source %}auto{% if not loop.last %}, {% endif %}{% endfor %}),
+    stroke: 0.5pt + luma(160),
+    inset: (x: 8pt, y: 6pt),
+    align: center + horizon,
+{%- if block.headers %}
+{%- for h in block.headers %}
+    table.cell(fill: luma(230))[#text(weight: "bold")[#{{ h | typst_string }}]],
+{%- endfor %}
+{%- endif %}
+{%- for row in block.rows %}
+{%- for cell in row %}
+    [#{{ cell | typst_string }}],
+{%- endfor %}
+{%- endfor %}
+  )
+]
+#v(8pt)
+{%- endif %}
+{%- elif block.type == "graph" %}
+#v(8pt)
+#align(center)[
+  #{
+    import "@preview/cetz:0.3.4": canvas, draw
+    let _r = 0.45
+    let _ns = 0.8pt + rgb("#4a9ede")
+    let _nf = rgb("#d6eef8")
+    let _ef(a, b) = {
+      let dx = b.at(0) - a.at(0)
+      let dy = b.at(1) - a.at(1)
+      let d = calc.sqrt(dx * dx + dy * dy)
+      if d < 0.001 { a } else { (a.at(0) + dx / d * _r, a.at(1) + dy / d * _r) }
+    }
+    canvas({
+      import draw: *
+      let _aw = (end: ">", fill: black)
+      let _baw = (start: ">", end: ">", fill: black)
+      let _p = (
+{%- for n in block.nodes %}
+        "{{ n.id }}": ({{ n.pos[0] }}, {{ n.pos[1] }}),
+{%- endfor %}
+      )
+{%- for e in block.edges %}
+{%- if e.ctrl_pos %}
+      let _c1_{{ loop.index }} = ({{ e.ctrl_pos[0][0] }}, {{ e.ctrl_pos[0][1] }})
+      let _c2_{{ loop.index }} = ({{ e.ctrl_pos[1][0] }}, {{ e.ctrl_pos[1][1] }})
+      bezier(_ef(_p.at("{{ e.from }}"), _c1_{{ loop.index }}), _ef(_p.at("{{ e.to }}"), _c2_{{ loop.index }}), _c1_{{ loop.index }}, _c2_{{ loop.index }}, mark: {% if e.bidirectional %}_baw{% elif e.directed %}_aw{% endif %})
+{%- else %}
+      line(_ef(_p.at("{{ e.from }}"), _p.at("{{ e.to }}")), _ef(_p.at("{{ e.to }}"), _p.at("{{ e.from }}")), mark: {% if e.bidirectional %}_baw{% elif e.directed %}_aw{% endif %})
+{%- endif %}
+{%- endfor %}
+{%- for n in block.nodes %}
+      circle(_p.at("{{ n.id }}"), radius: _r, stroke: _ns, fill: _nf)
+      content(_p.at("{{ n.id }}"), [{{ n.label }}])
+{%- endfor %}
+    })
+  }
+]
+#v(8pt)
+{%- endif %}
+{%- endfor %}
+{%- endmacro %}
