@@ -20,6 +20,9 @@
   justify: true,
 )
 
+#show math.equation.where(block: false): it => text(size: 12pt, it)
+#show table.cell.where(y: 0): set text(weight: "bold")
+
 // ─── Header ───
 #align(center)[
   {% if course %}
@@ -44,24 +47,31 @@
   #text(size: 10.5pt, weight: "bold")[Answer Summary]
 ]
 #v(6pt)
+{% for chunk in problems | batch(10) %}
+{% set offset = loop.index0 * 10 %}
 #align(center)[
   #table(
-    columns: ({% for p in problems %}38pt{% if not loop.last %}, {% endif %}{% endfor %}),
+    columns: ({% for p in chunk %}38pt{% if not loop.last %}, {% endif %}{% endfor %}),
     align: center + horizon,
     stroke: 0.4pt + luma(160),
     inset: 6pt,
-    ..for i in range({{ problems | length }}) {
-      (table.cell(fill: luma(240))[#text(size: 8.5pt, weight: "bold")[#str(i + 1)]],)
+    ..for i in range({{ chunk | length }}) {
+      (table.cell(fill: luma(240))[#text(size: 8.5pt, weight: "bold")[#str({{ offset }} + i + 1)]],)
     },
-{% for p in problems %}
+{% for p in chunk %}
     [#text(size: 9.5pt, weight: "bold")[{{ p.answer_label }}]],
 {% endfor %}
   )
 ]
+{% if not loop.last %}#v(4pt){% endif %}
+{% endfor %}
 
 #v(20pt)
 #line(length: 100%, stroke: 0.4pt + luma(180))
 #v(16pt)
+
+// ─── Table auto style (applies only to content tables below) ───
+#set table(fill: (x, y) => if y == 0 { luma(230) } else { none })
 
 // ─── Detailed Solutions ───
 {% for p in problems %}
@@ -74,12 +84,13 @@
   #grid(
     columns: (auto, 1fr, auto),
     align: horizon,
-    text(weight: "bold", size: 11pt)[{{ loop.index }}. \[{{ p.id }}\]],
+    text(weight: "bold", size: 11pt)[{{ loop.index }}.],
     [],
-    text(size: 9.5pt, weight: "bold")[Answer: {{ p.answer_label }}{% if p.type == "mcq" %}.{% endif %}],
+    text(size: 9.5pt, weight: "bold")[{% if p.has_subproblems %}소문제 포함{% else %}정답: {{ p.answer_label }}{% endif %}],
   )
 
   #v(4pt)
+{% if not p.has_subproblems %}
   #pad(left: 16pt)[
 {% if p.answer_is_typst %}
 {{ p.answer_text }}
@@ -87,14 +98,37 @@
 #{{ p.answer_text | typst_string }}
 {% endif %}
   ]
+{% else %}
+{% for sub in p.subproblems %}
+  #v(6pt)
+  #pad(left: 16pt)[
+    #grid(
+      columns: (auto, 1fr, auto),
+      column-gutter: 6pt,
+      align: top,
+      text(weight: "bold")[{{ sub.id | typst_string }}],
+      [
+{% if sub.answer_is_typst %}
+{{ sub.answer_text }}
+{% else %}
+#{{ sub.answer_text | typst_string }}
+{% endif %}
+      ],
+      text(size: 9.5pt, weight: "bold")[정답: {{ sub.answer_label }}],
+    )
+  ]
+{% if not loop.last %}
+  #v(3pt)
+  #line(length: 88%, stroke: 0.2pt + luma(210))
+{% endif %}
+{% endfor %}
+{% endif %}
 
 {% if p.source %}
   #v(3pt)
   #pad(left: 16pt)[
     #set text(size: 9pt, fill: luma(120), style: "italic")
-{% if p.source %}
     Source: #{{ p.source | typst_string }}
-{% endif %}
   ]
 {% endif %}
 

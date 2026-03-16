@@ -1,0 +1,137 @@
+title: "심화 기능 샘플"
+course: "수학 / 프로그래밍"
+date: "2026-03-16"
+problems:
+  # ── 표(table) 기능 예시 ──────────────────────────────────────────────────────
+  - id: "T1"
+    type: "short"
+    question: "다음 표를 보고 2021년부터 2023년까지의 평균 매출(억원)을 구하시오."
+    question_blocks:
+      - type: table
+        headers: ["연도", "매출(억원)", "영업이익(억원)"]
+        rows:
+          - ["2021", "1,200", "150"]
+          - ["2022", "1,500", "200"]
+          - ["2023", "1,800", "180"]
+      - type: requirements
+        content: "단, 소수점 첫째 자리에서 반올림하시오."
+    answer: "1,500"
+    points: 3
+
+  # ── 가운데 정렬 수식(formula) + 요구사항(requirements) 예시 ──────────────────
+  - id: "F1"
+    type: "mcq"
+    question: "다음 등차수열의 합 공식을 이용하여 첫째 항이 2, 공차가 3인 등차수열의 첫 10개 항의 합을 구하시오."
+    question_blocks:
+      - type: formula
+        content: "S_n = n/2 (2a + (n-1)d)"
+      - type: requirements
+        content: "단, a는 첫째 항, d는 공차, n은 항의 수이다."
+    choices:
+      - "155"
+      - "160"
+      - "165"
+      - "170"
+    answer: 3
+    points: 2
+
+  # ── sub-문제(subproblems) 예시 ───────────────────────────────────────────────
+  - id: "S1"
+    type: "short"
+    question: "다음 Python 코드를 읽고 물음에 답하시오."
+    question_blocks:
+      - type: typst
+        content: |
+          #raw(block: true, lang: "python", "def factorial(n):
+              if n <= 1:
+                  return 1
+              return n * factorial(n - 1)
+
+          print(factorial(5))
+          print(factorial(0))")
+    subproblems:
+      - id: "(1)"
+        type: "short"
+        question: "위 코드의 출력 결과를 순서대로 쓰시오."
+        answer: "120\n1"
+        points: 2
+      - id: "(2)"
+        type: "short"
+        question: "위 함수에서 사용된 프로그래밍 기법의 이름을 쓰시오."
+        answer: "재귀(Recursion)"
+        points: 1
+      - id: "(3)"
+        type: "mcq"
+        question: "factorial(0)의 반환값은 무엇인가?"
+        choices:
+          - "0"
+          - "1"
+          - "None"
+          - "오류 발생"
+        answer: 2
+        points: 1
+    points: 4
+
+  # ── 방향 그래프(graph) 예시 ─────────────────────────────────────────────────
+  # cetz 좌표계: x는 오른쪽, y는 위 방향이 양수
+  # A=왼쪽위, B=오른쪽위, C=왼쪽아래, D=오른쪽아래
+  - id: "G1"
+    type: "short"
+    question: "다음 방향 그래프에서 노드 A에서 D로 가는 모든 경로를 구하시오."
+    question_blocks:
+      - type: graph
+        nodes:
+          - id: "A"
+            label: "$A$"
+            pos: [0, 3]
+          - id: "B"
+            label: "$B$"
+            pos: [3, 3]
+          - id: "C"
+            label: "$C$"
+            pos: [0, 0]
+          - id: "D"
+            label: "$D$"
+            pos: [3, 0]
+        edges:
+          - from: "A"
+            to: "B"
+          - from: "C"
+            to: "A"
+          - from: "A"
+            to: "D"
+          - from: "B"
+            to: "C"
+          - from: "B"
+            to: "D"
+          - from: "D"
+            to: "C"
+          - from: "D"
+            to: "B"
+            bend: -40       # 오른쪽 바깥쪽으로 굽힘 (D→B는 위 방향, -=오른쪽)
+    answer: "A→D, A→B→D"
+    points: 3
+
+  # ── 표 + sub-문제 결합 예시 ──────────────────────────────────────────────────
+  - id: "C1"
+    type: "short"
+    question: "다음 학생 성적표를 보고 물음에 답하시오."
+    question_blocks:
+      - type: table
+        headers: ["이름", "국어", "수학", "영어"]
+        rows:
+          - ["김철수", "85", "92", "78"]
+          - ["이영희", "90", "75", "88"]
+          - ["박민준", "78", "88", "95"]
+    subproblems:
+      - id: "(1)"
+        type: "short"
+        question: "수학 점수가 가장 높은 학생의 이름을 쓰시오."
+        answer: "김철수"
+        points: 1
+      - id: "(2)"
+        type: "short"
+        question: "세 과목 합산 점수가 가장 높은 학생의 이름을 쓰시오."
+        answer: "박민준 (합계 261점)"
+        points: 2
+    points: 3
