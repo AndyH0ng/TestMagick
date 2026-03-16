@@ -338,8 +338,25 @@ problems:
 ```
 `pos`: [x, y], y↑ 기준. `bend`: 양수=왼쪽 굽힘, 음수=오른쪽.
 
+## question vs question_typst 선택 기준
+- `question`: 수식이 **전혀 없는** 순수 한국어/영어 텍스트만 사용
+- `question_typst`: 문장 안에 수식이 **한 글자라도** 있으면 반드시 사용
+  - 인라인 수식(문장 중간)은 `$...$`로 감싼다
+  - 예: `"$a_1 eq.not a_2$일 때, 이 연립방정식은 하나의 해만 가짐을 보여라."`
+
+```yaml
+# ❌ 잘못된 예 — 수식을 그냥 텍스트로 삽입
+question: "a1 ≠ a2일 때, 유일해임을 보여라."
+
+# ✅ 올바른 예 — 인라인 수식을 $...$로 처리
+question_typst: "$a_1 eq.not a_2$일 때, 유일해임을 보여라."
+
+# ✅ 또 다른 예 — 여러 인라인 수식
+question_typst: "다항식 $p(x) = a_0 + a_1 x + a_2 x^2$이 점 $(1, 3)$을 지날 때 $a_0$를 구하라."
+```
+
 ## subproblem 필드
-Problem과 동일 (id, type, question, question_blocks, choices, answer, points).
+Problem과 동일 (id, type, question, question_typst, question_blocks, choices, answer, points).
 단, subproblems 중첩 불가.
 
 ## 자주 쓰는 Typst 수식
@@ -347,6 +364,7 @@ Problem과 동일 (id, type, question, question_blocks, choices, answer, points)
 |------|-------|
 | 분수 | `frac(a, b)` |
 | 첨자/제곱 | `x_1`, `x^2` |
+| 같지 않음 | `eq.not` |
 | 행렬 | `mat(delim: "[", 1,2; 3,4)` |
 | 첨가행렬 | `mat(delim: "[", augment: #2, 1,2,3; 4,5,6)` |
 | 연립방정식 | `cases(x+y=1, x-y=2)` |
@@ -380,12 +398,15 @@ _PROMPT_HINT = """\
 
 규칙:
 - 각 문제 id는 원본 번호 그대로 사용 ("1", "2", ...)
-- 수식은 question_blocks의 formula 타입으로 ($ 없이 Typst 수식 문법)
+- 독립 줄 수식(가운데 정렬)은 question_blocks의 formula 타입으로 ($ 없이 Typst 수식 문법)
 - 행렬은 mat(delim: "[", ...) 사용, 첨가행렬은 augment: #N 파라미터
 - 소문제가 있으면 반드시 subproblems 배열로
 - 풀이/해설은 answer_typst에 Typst 마크업으로 작성
-- question 필드에는 순수 텍스트만, 수식이 포함되면 question_typst 또는
-  question_blocks 사용
+- question 필드에는 수식이 전혀 없는 순수 텍스트만 사용
+- 문장 중간에 수식이 한 글자라도 있으면 반드시 question_typst 사용,
+  인라인 수식은 $...$로 감쌀 것
+  예) question_typst: "$a_1 eq.not a_2$일 때, 유일해임을 보여라."
+- choices/answer도 동일: 수식 포함 시 choices_typst, answer_typst 사용
 ```
 """
 
