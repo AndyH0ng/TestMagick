@@ -96,7 +96,9 @@ def _text_quality_score(text: str) -> float:
     return len_score * short_score
 
 
-def _decide_page(page: object, math_font_threshold: bool = True, quality_threshold: float = 0.40) -> tuple[bool, str, float]:
+def _decide_page(
+    page: object, math_font_threshold: bool = True, quality_threshold: float = 0.40
+) -> tuple[bool, str, float]:
     """페이지를 이미지로 처리할지 텍스트로 처리할지 결정한다.
 
     Returns:
@@ -214,7 +216,9 @@ def _run_text(doc: object, out_dir: Path) -> tuple[Path, list[PageDecision], int
     return text_path, decisions, tokens
 
 
-def _run_images(doc: object, out_dir: Path, dpi: int, quality: int) -> tuple[list[Path], list[PageDecision], int]:
+def _run_images(
+    doc: object, out_dir: Path, dpi: int, quality: int
+) -> tuple[list[Path], list[PageDecision], int]:
     paths: list[Path] = []
     decisions: list[PageDecision] = []
     total_tokens = 0
@@ -229,7 +233,9 @@ def _run_images(doc: object, out_dir: Path, dpi: int, quality: int) -> tuple[lis
     return paths, decisions, total_tokens
 
 
-def _run_mixed(doc: object, out_dir: Path, dpi: int, quality: int) -> tuple[Path, list[Path], list[PageDecision], int]:
+def _run_mixed(
+    doc: object, out_dir: Path, dpi: int, quality: int
+) -> tuple[Path, list[Path], list[PageDecision], int]:
     """페이지마다 수식 감지 → 이미지 또는 텍스트로 처리."""
     text_parts: list[str] = []
     img_paths: list[Path] = []
