@@ -158,8 +158,6 @@ class SubProblem(BaseModel):
                         "객관식 텍스트 정답은 choices 중 하나와 정확히 일치해야 합니다."
                     )
                 self.answer = answer_text
-            if self.answer_typst:
-                raise ValueError("객관식 소문제에는 answer_typst를 사용할 수 없습니다.")
         else:
             if self.choices or self.choices_typst:
                 raise ValueError("주관식 소문제에는 choices/choices_typst를 넣을 수 없습니다.")
@@ -286,8 +284,6 @@ class Problem(BaseModel):
                     )
                 self.answer = answer_text
 
-            if self.answer_typst:
-                raise ValueError("객관식 문항에는 answer_typst를 사용할 수 없습니다.")
             if self.subproblems:
                 raise ValueError("객관식 문항에는 subproblems를 사용할 수 없습니다.")
         else:

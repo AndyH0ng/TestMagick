@@ -51,6 +51,46 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="package.zip 생성을 비활성화합니다.",
     )
+
+    preprocess_parser = subparsers.add_parser(
+        "preprocess",
+        help="PDF를 LLM 전달용으로 전처리합니다 (텍스트 추출 또는 이미지 압축).",
+    )
+    preprocess_parser.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="입력 PDF 파일 경로",
+    )
+    preprocess_parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("out/prep"),
+        help="출력 디렉터리 (기본: out/prep)",
+    )
+    preprocess_parser.add_argument(
+        "--method",
+        choices=["auto", "mixed", "text", "images", "markdown"],
+        default="auto",
+        help=(
+            "처리 방식: auto=자동감지(기본), mixed=페이지별 수식 감지,"
+            " text=텍스트 강제, images=이미지 강제,"
+            " markdown=AI 수식 인식 후 LaTeX Markdown 출력 (marker-pdf 필요)"
+        ),
+    )
+    preprocess_parser.add_argument(
+        "--dpi",
+        type=int,
+        default=150,
+        help="이미지 모드 해상도 (기본: 150)",
+    )
+    preprocess_parser.add_argument(
+        "--quality",
+        type=int,
+        default=72,
+        help="JPEG 압축 품질 0-100 (기본: 72)",
+    )
+
     return parser
 
 
@@ -126,6 +166,96 @@ def _run_build(input_path: Path, out_dir: Path, title: str | None, no_zip: bool)
     return 0
 
 
+_REASON_LABEL: dict[str, str] = {
+    "math_font": "수식 폰트",
+    "low_quality": "텍스트 품질 낮음",
+    "no_text": "텍스트 없음",
+    "text_ok": "텍스트",
+    "forced_text": "텍스트(강제)",
+    "forced_images": "이미지(강제)",
+}
+
+
+def _run_preprocess(
+    pdf_path: Path,
+    out_dir: Path,
+    method: str,
+    dpi: int,
+    quality: int,
+) -> int:
+    from testmagick.preprocess import preprocess_pdf
+
+    try:
+        result = preprocess_pdf(
+            pdf_path,
+            out_dir,
+            method=method,  # type: ignore[arg-type]
+            dpi=dpi,
+            quality=quality,
+        )
+    except ImportError as exc:
+        print(f"{_err_tag()} {exc}")
+        return 1
+    except Exception as exc:
+        print(f"{_err_tag()} PDF 전처리 실패: {exc}")
+        return 1
+
+    method_labels = {
+        "text": "텍스트 추출",
+        "images": f"이미지 압축 ({dpi} dpi · JPEG {quality}%)",
+        "mixed": f"mixed (페이지별 수식 감지 · 이미지 {dpi} dpi)",
+        "markdown": "AI 수식 인식 → LaTeX Markdown (marker-pdf)",
+    }
+    method_label = method_labels.get(result.method, result.method)
+
+    img_pages = sum(1 for d in result.page_decisions if d.use_image)
+    txt_pages = result.page_count - img_pages
+
+    print(f"{_ok_tag()} 전처리 완료 [{method_label}] — {result.page_count}페이지")
+    print()
+
+    # 페이지별 결정 표 (mixed 모드일 때만)
+    if result.method == "mixed":
+        for d in result.page_decisions:
+            bar = "▓" if not d.use_image else "░"
+            kind = _REASON_LABEL.get(d.reason, d.reason)
+            score_str = f"  score={d.quality_score:.2f}" if d.reason != "no_text" else ""
+            print(f"  p{d.page_num:>2}  {bar}  {kind}{score_str}")
+        print()
+        print(f"  텍스트 페이지: {txt_pages}  /  이미지 페이지: {img_pages}")
+        print()
+
+    # 출력 파일 목록
+    for f in result.all_files:
+        size_kb = f.stat().st_size / 1024
+        print(f"  {_path_label(f.name):<26} {size_kb:>7.1f} KB")
+    schema_kb = result.schema_ref.stat().st_size / 1024
+    print(f"  {_path_label('schema_ref.md'):<26} {schema_kb:>7.1f} KB")
+    print(f"  {_path_label('prompt.md')}")
+    print()
+
+    # 토큰 추정
+    schema_tokens = int(schema_kb * 1024 / 3.5)
+    total_tokens = result.est_tokens + schema_tokens
+    print(f"  {'추정 토큰 (본문)':<20} ~{result.est_tokens:>6,}")
+    print(f"  {'스키마 참조':<20} ~{schema_tokens:>6,}")
+    print(f"  {'합계':<20} ~{total_tokens:>6,}")
+
+    if result.method in ("images", "mixed") and img_pages > 0:
+        import math
+        orig_w = int((1240 / 150) * 300)
+        orig_h = int((1754 / 150) * 300)
+        orig_tiles = math.ceil(orig_w / 512) * math.ceil(orig_h / 512)
+        orig_img_tokens = orig_tiles * 170 * img_pages
+        cur_img_tokens = result.est_tokens  # 근사
+        if orig_img_tokens > 0:
+            saved_pct = max(0.0, (1 - cur_img_tokens / orig_img_tokens) * 100)
+            print(f"\n  이미지 {img_pages}페이지 기준, 300dpi 대비 ~{saved_pct:.0f}% 토큰 절감")
+
+    print(f"\n출력 경로: {_path_label(str(out_dir.resolve()))}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -138,6 +268,14 @@ def main(argv: list[str] | None = None) -> int:
             out_dir=args.out,
             title=args.title,
             no_zip=args.no_zip,
+        )
+    if args.command == "preprocess":
+        return _run_preprocess(
+            pdf_path=args.input,
+            out_dir=args.out,
+            method=args.method,
+            dpi=args.dpi,
+            quality=args.quality,
         )
 
     parser.print_help()

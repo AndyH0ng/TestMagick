@@ -17,11 +17,10 @@ from testmagick.schema import (
     RequirementsBlock,
     SubProblem,
     TableBlock,
-    TextBlock,
     TypstBlock,
 )
 
-OPTION_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+OPTION_LABELS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
 ProblemPayload = dict[str, Any]
 
 
@@ -136,12 +135,11 @@ def _answer_payload(problem: Problem) -> dict[str, str | bool]:
         answer_index = problem.resolved_answer_index()
         if answer_index is None:
             return {"label": "TEXT", "value": "", "is_typst": False}
-        value, is_typst = problem.choice_item(answer_index)
-        return {
-            "label": option_label(answer_index - 1),
-            "value": value,
-            "is_typst": is_typst,
-        }
+        answer_value, answer_is_typst = problem.choice_item(answer_index)
+        label = option_label(answer_index - 1)
+        if problem.answer_typst:
+            return {"label": label, "value": problem.answer_typst, "is_typst": True}
+        return {"label": label, "value": answer_value, "is_typst": answer_is_typst}
 
     if problem.answer_typst:
         return {"label": "TEXT", "value": problem.answer_typst, "is_typst": True}
@@ -163,8 +161,11 @@ def _sub_answer_payload(sub: SubProblem) -> dict[str, str | bool]:
         answer_index = sub.resolved_answer_index()
         if answer_index is None:
             return {"label": "TEXT", "value": "", "is_typst": False}
-        value, is_typst = sub.choice_item(answer_index)
-        return {"label": option_label(answer_index - 1), "value": value, "is_typst": is_typst}
+        answer_value, answer_is_typst = sub.choice_item(answer_index)
+        label = option_label(answer_index - 1)
+        if sub.answer_typst:
+            return {"label": label, "value": sub.answer_typst, "is_typst": True}
+        return {"label": label, "value": answer_value, "is_typst": answer_is_typst}
     if sub.answer_typst:
         return {"label": "TEXT", "value": sub.answer_typst, "is_typst": True}
     return {"label": "TEXT", "value": str(sub.answer or ""), "is_typst": False}

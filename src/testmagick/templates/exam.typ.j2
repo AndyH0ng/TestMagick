@@ -21,6 +21,10 @@
   justify: true,
 )
 
+#show math.equation.where(block: false): it => text(size: 12pt, it)
+#set table(fill: (x, y) => if y == 0 { luma(230) } else { none })
+#show table.cell.where(y: 0): set text(weight: "bold")
+
 // ─── Header ───
 #align(center)[
   {% if course %}
@@ -83,16 +87,21 @@
 {{ render_blocks(p.question_blocks) }}
 {% endif %}
 {% if p.has_subproblems %}
-  #v(10pt)
+  #v(16pt)
 {% for sub in p.subproblems %}
   #block(
     width: 100%,
     breakable: true,
-    above: {% if loop.first %}0pt{% else %}10pt{% endif %},
+    above: {% if loop.first %}0pt{% else %}16pt{% endif %},
     below: 0pt,
   )[
     #pad(left: 16pt)[
-      #text(weight: "bold")[{{ sub.id }}] #h(6pt)
+      #grid(
+        columns: (auto, 1fr),
+        column-gutter: 6pt,
+        align: top,
+        text(weight: "bold")[{{ sub.id }}],
+        [
 {% if sub.question_is_typst %}
 {{ sub.question_typst }}
 {% elif sub.question %}
@@ -102,23 +111,25 @@
 {{ render_blocks(sub.question_blocks) }}
 {% endif %}
 {% if sub.type == "mcq" %}
-      #v(7pt)
-      #pad(left: 16pt)[
+          #v(4pt)
+          #pad(left: 8pt)[
 {% for choice in sub.choices %}
-        #block(spacing: 7pt)[({{ choice.label }}) #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
+            #block(spacing: 5pt)[{{ choice.label }} #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
 {% if not loop.last %}
-        #v(4pt)
+            #v(2pt)
 {% endif %}
 {% endfor %}
-      ]
+          ]
 {% else %}
-      #v(8pt)
-      #block(
-        width: 100%,
-        height: 25pt,
-        stroke: (bottom: 0.4pt + luma(200)),
-      )[]
+          #v(6pt)
+          #block(
+            width: 100%,
+            height: 25pt,
+            stroke: (bottom: 0.4pt + luma(200)),
+          )[]
 {% endif %}
+        ],
+      )
     ]
   ]
 {% endfor %}
@@ -127,7 +138,7 @@
   #v(7pt)
   #pad(left: 16pt)[
 {% for choice in p.choices %}
-    #block(spacing: 7pt)[({{ choice.label }}) #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
+    #block(spacing: 7pt)[{{ choice.label }} #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
 {% if not loop.last %}
     #v(4pt)
 {% endif %}
