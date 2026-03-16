@@ -35,7 +35,7 @@ class PageDecision:
 
 @dataclass
 class PreprocessResult:
-    method: Literal["text", "images", "mixed"]
+    method: Literal["text", "images", "mixed", "markdown"]
     text_file: Path | None = None       # text.txt (text/mixed 모드)
     image_files: list[Path] = field(default_factory=list)   # page_*.jpg
     schema_ref: Path = field(default=Path())
@@ -172,19 +172,13 @@ def _clean_text(text: str) -> str:
 
 # ─── 렌더링 헬퍼 ─────────────────────────────────────────────────────────────
 
-def _render_page(page: object, path: Path, dpi: int, quality: int) -> None:
+def _render_page(page: object, path: Path, dpi: int, quality: int) -> tuple[int, int]:
+    """페이지를 JPEG로 렌더링하고 (width, height)를 반환한다."""
     import fitz
     scale = dpi / 72.0
     mat = fitz.Matrix(scale, scale)
     pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY)  # type: ignore[attr-defined]
     path.write_bytes(pix.tobytes(output="jpg", jpg_quality=quality))
-
-
-def _pixel_dims(page: object, dpi: int) -> tuple[int, int]:
-    import fitz
-    scale = dpi / 72.0
-    mat = fitz.Matrix(scale, scale)
-    pix = page.get_pixmap(matrix=mat)  # type: ignore[attr-defined]
     return pix.width, pix.height
 
 
@@ -224,10 +218,8 @@ def _run_images(
     total_tokens = 0
     for i, page in enumerate(doc):  # type: ignore[arg-type]
         path = out_dir / f"page_{i + 1:03d}.jpg"
-        _render_page(page, path, dpi, quality)
-        w, h = _pixel_dims(page, dpi)
-        tok = _est_image_tokens(w, h)
-        total_tokens += tok
+        w, h = _render_page(page, path, dpi, quality)
+        total_tokens += _est_image_tokens(w, h)
         decisions.append(PageDecision(i + 1, True, "forced_images", 0.0, path))
         paths.append(path)
     return paths, decisions, total_tokens
@@ -247,8 +239,7 @@ def _run_mixed(
 
         if use_img:
             img_path = out_dir / f"page_{i + 1:03d}.jpg"
-            _render_page(page, img_path, dpi, quality)
-            w, h = _pixel_dims(page, dpi)
+            w, h = _render_page(page, img_path, dpi, quality)
             total_tokens += _est_image_tokens(w, h)
             # txt 파일에 이미지 마커 삽입
             text_parts.append(f"[페이지 {i + 1} → 이미지: page_{i + 1:03d}.jpg]")
@@ -456,10 +447,11 @@ def preprocess_pdf(
     """PDF를 LLM 전달에 최적화된 형태로 전처리한다.
 
     방법:
-      auto   : 텍스트 레이어 있으면 mixed, 없으면 images (기본값)
-      mixed  : 페이지마다 수식 감지 → 수식 페이지는 이미지, 나머지는 텍스트
-      text   : 모든 페이지 텍스트 추출 (강제)
-      images : 모든 페이지 이미지 압축 (강제)
+      auto     : 텍스트 레이어 있으면 mixed, 없으면 images (기본값)
+      mixed    : 페이지마다 수식 감지 → 수식 페이지는 이미지, 나머지는 텍스트
+      text     : 모든 페이지 텍스트 추출 (강제)
+      images   : 모든 페이지 이미지 압축 (강제)
+      markdown : marker-pdf로 PDF → LaTeX Markdown 변환 (content.md 출력)
     """
     _require_pymupdf()
     out_dir.mkdir(parents=True, exist_ok=True)

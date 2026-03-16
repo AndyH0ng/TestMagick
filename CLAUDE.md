@@ -130,7 +130,7 @@ question_blocks:
     nodes:
       - id: "A"
         label: "$A$"    # Typst 콘텐츠; 생략하면 id가 표시됨
-        pos: [0, 0]     # [x, y] 좌표 (y축 아래가 양수)
+        pos: [0, 0]     # [x, y] 좌표 (y축 위가 양수, 수학 좌표계)
       - id: "B"
         label: "$B$"
         pos: [3, 0]

@@ -100,7 +100,7 @@
         columns: (auto, 1fr),
         column-gutter: 6pt,
         align: top,
-        text(weight: "bold")[{{ sub.id }}],
+        text(weight: "bold")[{{ sub.id | typst_string }}],
         [
 {% if sub.question_is_typst %}
 {{ sub.question_typst }}
