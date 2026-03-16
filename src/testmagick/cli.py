@@ -23,6 +23,16 @@ def _build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="YAML/JSON 입력 파일 경로",
     )
+    validate_parser.add_argument(
+        "--expect",
+        type=str,
+        default=None,
+        metavar="SPEC",
+        help=(
+            "소문제 기대치 지정. 형식: '문제ID:개수,...' "
+            "(예: '1:5,7:8,8:3'). 실제와 다르면 LLM 교정 프롬프트를 출력."
+        ),
+    )
 
     build_parser = subparsers.add_parser(
         "build",
@@ -133,7 +143,41 @@ def _path_label(text: str) -> str:
     return _color(text, "36")
 
 
-def _run_validate(input_path: Path) -> int:
+def _parse_expect(spec: str) -> dict[str, int]:
+    """'1:5,7:8,8:3' 형식을 {problem_id: expected_count} 딕셔너리로 파싱."""
+    result: dict[str, int] = {}
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" not in part:
+            raise ValueError(f"--expect 형식 오류: '{part}' (올바른 형식: '문제ID:개수')")
+        pid, count_str = part.rsplit(":", 1)
+        result[pid.strip()] = int(count_str.strip())
+    return result
+
+
+def _make_feedback_prompt(input_path: Path, issues: list[tuple[str, int, int]]) -> str:
+    yaml_text = input_path.read_text(encoding="utf-8")
+    missing_lines = "\n".join(
+        f"- 문제 \"{pid}\": 소문제 {exp}개 필요, 현재 {act}개 ({exp - act}개 누락)"
+        for pid, exp, act in issues
+    )
+    return (
+        "다음 YAML 파일에서 소문제가 누락되어 있습니다.\n\n"
+        f"[누락 항목]\n{missing_lines}\n\n"
+        "[현재 YAML]\n"
+        "```yaml\n"
+        f"{yaml_text.rstrip()}\n"
+        "```\n\n"
+        "[요청]\n"
+        "누락된 소문제를 모두 채워서 완성된 YAML을 출력해주세요.\n"
+        "기존 문제는 그대로 유지하고, 누락된 소문제만 추가하세요.\n"
+        "절대 생략하거나 '...' 처리하지 마세요."
+    )
+
+
+def _run_validate(input_path: Path, expect: str | None = None) -> int:
     try:
         exam_set = load_exam(input_path)
     except InputLoadError as exc:
@@ -183,7 +227,39 @@ def _run_validate(input_path: Path) -> int:
     ]
     print("  " + "  |  ".join(p for p in parts if p))
     print()
-    return 0
+
+    if not expect:
+        return 0
+
+    try:
+        expected_map = _parse_expect(expect)
+    except ValueError as exc:
+        print(f"{_err_tag()} {exc}")
+        return 1
+
+    actual_map = {p.id: len(p.subproblems or []) for p in problems}
+    issues: list[tuple[str, int, int]] = []
+    for pid, exp_count in expected_map.items():
+        act_count = actual_map.get(pid, 0)
+        if act_count < exp_count:
+            issues.append((pid, exp_count, act_count))
+
+    if not issues:
+        print(f"{_ok_tag()} 소문제 수가 기대치와 일치합니다.")
+        print()
+        return 0
+
+    warn_tag = _badge("WARN", "30;48;2;255;190;0;1")
+    print(f"{warn_tag} 소문제 부족 — {len(issues)}개 문제에서 누락 발견\n")
+    for pid, exp, act in issues:
+        print(f"  문제 {_color(pid, '1')}: 예상 {exp}개, 실제 {act}개 "
+              f"({_color(str(exp - act) + '개 누락', '33')})")
+    print()
+    print(_color("── LLM 교정 프롬프트 (복사해서 LLM에 붙여넣기) ──", "2"))
+    print()
+    print(_make_feedback_prompt(input_path, issues))
+    print()
+    return 1
 
 
 def _run_build(input_path: Path, out_dir: Path, title: str | None, no_zip: bool) -> int:
@@ -303,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "validate":
-        return _run_validate(input_path=args.input)
+        return _run_validate(input_path=args.input, expect=args.expect)
     if args.command == "build":
         return _run_build(
             input_path=args.input,
