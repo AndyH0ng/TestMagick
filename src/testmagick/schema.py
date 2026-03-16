@@ -34,11 +34,35 @@ class TableBlock(BaseModel):
     headers: list[str] | None = None
     rows: list[list[str]] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def _validate_table(self) -> TableBlock:
+        col_source = self.headers if self.headers is not None else (
+            self.rows[0] if self.rows else None
+        )
+        if col_source is None:
+            raise ValueError("TableBlock에는 headers 또는 최소 한 개의 rows가 필요합니다.")
+        expected = len(col_source)
+        for i, row in enumerate(self.rows):
+            if len(row) != expected:
+                raise ValueError(
+                    f"TableBlock의 {i + 1}번째 행의 열 수({len(row)})가 "
+                    f"기준 열 수({expected})와 다릅니다."
+                )
+        return self
+
 
 class GraphNode(BaseModel):
-    id: str
+    id: str = Field(min_length=1)
     label: str | None = None  # Typst 콘텐츠; None이면 id를 그대로 표시
     pos: list[float]          # [x, y] 그리드 좌표
+
+    @field_validator("id")
+    @classmethod
+    def _strip_id(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("GraphNode id는 비워둘 수 없습니다.")
+        return cleaned
 
     @field_validator("pos")
     @classmethod
@@ -51,8 +75,16 @@ class GraphNode(BaseModel):
 class GraphEdge(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    from_node: str = Field(alias="from")
-    to: str
+    from_node: str = Field(alias="from", min_length=1)
+    to: str = Field(min_length=1)
+
+    @field_validator("from_node", "to")
+    @classmethod
+    def _strip_node_ref(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("GraphEdge의 from/to는 비워둘 수 없습니다.")
+        return cleaned
     label: str | None = None   # 간선 레이블 (Typst 콘텐츠)
     bend: float = 0            # 곡선 각도(degree); 양수=왼쪽, 음수=오른쪽
     directed: bool = True      # True → 화살표, False → 선
@@ -303,7 +335,8 @@ class Problem(BaseModel):
                     answer_text = self.answer.strip()
                 if not answer_text and not self.answer_typst:
                     raise ValueError(
-                        "주관식 문항에는 answer, answer_typst, 또는 subproblems 중 하나가 필요합니다."
+                        "주관식 문항에는 answer, answer_typst, 또는"
+                        " subproblems 중 하나가 필요합니다."
                     )
                 self.answer = answer_text or None
         return self
