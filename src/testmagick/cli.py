@@ -140,7 +140,49 @@ def _run_validate(input_path: Path) -> int:
         print(f"{_err_tag()} {exc}")
         return 1
 
-    print(f"{_ok_tag()} {input_path}에서 문제 {len(exam_set.problems)}개를 검증했습니다.")
+    problems = exam_set.problems
+    total_sub = sum(len(p.subproblems) for p in problems if p.subproblems)
+    total_pts = sum(
+        sum(s.points for s in p.subproblems) if p.subproblems else p.points
+        for p in problems
+    )
+
+    print(f"{_ok_tag()} 검증 완료: {_color(str(input_path), '36')}")
+    print()
+
+    col_n   = max(len(str(len(problems))), 1)
+    col_id  = max((len(p.id) for p in problems), default=2)
+    col_pts = 6
+
+    header = (
+        f"  {'#':>{col_n}}  "
+        f"{'ID':<{col_id}}  "
+        f"{'배점':>{col_pts}}  "
+        f"소문제"
+    )
+    print(_color(header, "2"))
+    print(_color("  " + "─" * (len(header) - 2), "2"))
+
+    for i, p in enumerate(problems, 1):
+        if p.subproblems:
+            pts = sum(s.points for s in p.subproblems)
+            sub_ids = " ".join(s.id for s in p.subproblems)
+            sub_summary = f"{len(p.subproblems)}개  {_color(sub_ids, '2')}"
+        else:
+            pts = p.points
+            sub_summary = _color("─", "2")
+
+        pts_str = f"{pts:.1f}pt"
+        print(f"  {i:>{col_n}}  {p.id:<{col_id}}  {pts_str:>{col_pts}}  {sub_summary}")
+
+    print()
+    parts = [
+        f"문제 {len(problems)}개",
+        f"소문제 {total_sub}개" if total_sub else None,
+        f"총 {total_pts:.1f}pt",
+    ]
+    print("  " + "  |  ".join(p for p in parts if p))
+    print()
     return 0
 
 
