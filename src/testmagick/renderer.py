@@ -12,6 +12,7 @@ from testmagick.schema import (
     ExamSet,
     FormulaBlock,
     GraphBlock,
+    MappingBlock,
     Problem,
     QuestionBlock,
     RequirementsBlock,
@@ -42,6 +43,22 @@ def typst_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+def _fix_latex_braces(math: str) -> str:
+    """LaTeX 스타일 _{...} / ^{...} → Typst 스타일 _(...) / ^(...) 변환 (비중첩 한정)."""
+    import re
+    return re.sub(r'([_^])\{([^{}]*)\}', r'\1(\2)', math)
+
+
+def typst_cell(value: str) -> str:
+    """Typst content block [...] 안에서 사용. $...$ 또는 #으로 시작하면 raw, 아니면 #"..." 이스케이프."""
+    s = value.strip()
+    if s.startswith("$") and s.endswith("$") and len(s) > 2:
+        return _fix_latex_braces(s)
+    if s.startswith("#"):
+        return s
+    return "#" + json.dumps(value, ensure_ascii=False)
+
+
 def _bend_ctrl(
     from_pos: list[float], to_pos: list[float], bend_deg: float
 ) -> list[list[float]] | None:
@@ -65,6 +82,72 @@ def _bend_ctrl(
     return [c1, c2]
 
 
+def _mapping_payload(block: MappingBlock) -> dict[str, Any]:
+    from_nodes = block.from_set.nodes
+    to_nodes = block.to_set.nodes
+    fn, tn = len(from_nodes), len(to_nodes)
+
+    oval_hw = 1.2        # oval half-width
+    node_spacing = 0.9
+    pad_y = 0.55         # vertical padding inside oval
+
+    def node_ys(n: int) -> list[float]:
+        top = (n - 1) * node_spacing / 2
+        return [top - i * node_spacing for i in range(n)]
+
+    left_ys = node_ys(fn)
+    right_ys = node_ys(tn)
+
+    left_cx = -2.5
+    right_cx = 2.5
+    left_hh = max(fn - 1, 0) * node_spacing / 2 + pad_y
+    right_hh = max(tn - 1, 0) * node_spacing / 2 + pad_y
+    left_radius = round(min(oval_hw, left_hh), 4)
+    right_radius = round(min(oval_hw, right_hh), 4)
+
+    from_idx = {n: i for i, n in enumerate(from_nodes)}
+    to_idx = {n: i for i, n in enumerate(to_nodes)}
+
+    edges_out = []
+    for edge in block.edges:
+        if edge.from_node not in from_idx:
+            continue
+        fi = from_idx[edge.from_node]
+        fy = left_ys[fi]
+        targets = edge.to if isinstance(edge.to, list) else [edge.to]
+        for t in targets:
+            if t not in to_idx:
+                continue
+            ti = to_idx[t]
+            edges_out.append({
+                "left_idx": fi + 1,   # 1-based (matches Jinja loop.index)
+                "right_idx": ti + 1,
+            })
+
+    return {
+        "type": "mapping",
+        "from_label": block.from_set.label,
+        "to_label": block.to_set.label,
+        "arrow_label": block.arrow_label,
+        "left_cx": left_cx,
+        "left_hh": round(left_hh, 4),
+        "left_radius": left_radius,
+        "right_cx": right_cx,
+        "right_hh": round(right_hh, 4),
+        "right_radius": right_radius,
+        "oval_hw": oval_hw,
+        "left_nodes": [
+            {"label": n, "x": left_cx, "y": round(left_ys[i], 4)}
+            for i, n in enumerate(from_nodes)
+        ],
+        "right_nodes": [
+            {"label": n, "x": right_cx, "y": round(right_ys[i], 4)}
+            for i, n in enumerate(to_nodes)
+        ],
+        "edges": edges_out,
+    }
+
+
 def _block_payload(block: QuestionBlock) -> dict[str, Any]:
     if isinstance(block, TableBlock):
         return {
@@ -78,6 +161,8 @@ def _block_payload(block: QuestionBlock) -> dict[str, Any]:
         return {"type": "requirements", "content": block.content}
     if isinstance(block, TypstBlock):
         return {"type": "typst", "content": block.content}
+    if isinstance(block, MappingBlock):
+        return _mapping_payload(block)
     if isinstance(block, GraphBlock):
         node_pos = {n.id: n.pos for n in block.nodes}
         return {
@@ -94,6 +179,7 @@ def _block_payload(block: QuestionBlock) -> dict[str, Any]:
                     "label": e.label,
                     "directed": e.directed,
                     "bidirectional": e.bidirectional,
+                    "is_self_loop": e.from_node == e.to,
                 }
                 for e in block.edges
             ],
@@ -173,12 +259,25 @@ def _sub_answer_payload(sub: SubProblem) -> dict[str, str | bool]:
 
 def _subproblem_payload(sub: SubProblem) -> dict[str, Any]:
     answer = _sub_answer_payload(sub)
+    
+    question = sub.question or ""
+    if question == sub.id:
+        question = ""
+    elif question.startswith(sub.id + " "):
+        question = question[len(sub.id) + 1 :].lstrip()
+
+    question_typst = sub.question_typst or ""
+    if question_typst == sub.id:
+        question_typst = ""
+    elif question_typst.startswith(sub.id + " "):
+        question_typst = question_typst[len(sub.id) + 1 :].lstrip()
+
     return {
         "id": sub.id,
         "type": sub.type,
-        "question": sub.question or "",
-        "question_typst": sub.question_typst or "",
-        "question_is_typst": bool(sub.question_typst),
+        "question": question,
+        "question_typst": question_typst,
+        "question_is_typst": bool(question_typst),
         "question_blocks": [_block_payload(b) for b in (sub.question_blocks or [])],
         "choices": _sub_choice_payload(sub),
         "answer_text": str(answer["value"]),
@@ -218,6 +317,7 @@ def _create_environment() -> Environment:
     )
     env.filters["option_label"] = option_label
     env.filters["typst_string"] = typst_string
+    env.filters["typst_cell"] = typst_cell
     return env
 
 

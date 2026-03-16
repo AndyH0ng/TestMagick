@@ -62,6 +62,76 @@ def _build_parser() -> argparse.ArgumentParser:
         help="package.zip 생성을 비활성화합니다.",
     )
 
+    generate_parser = subparsers.add_parser(
+        "generate",
+        help="PDF에서 YAML을 자동 생성하고 PDF를 빌드합니다 (LLM 피드백 루프).",
+    )
+    generate_parser.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="입력 PDF 파일 경로",
+    )
+    generate_parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("out"),
+        help="출력 디렉터리 (기본: out)",
+    )
+    generate_parser.add_argument(
+        "--method",
+        choices=["auto", "mixed", "text", "images", "markdown"],
+        default="auto",
+        help="전처리 방식 (기본: auto)",
+    )
+    generate_parser.add_argument(
+        "--dpi",
+        type=int,
+        default=150,
+        help="이미지 모드 해상도 (기본: 150)",
+    )
+    generate_parser.add_argument(
+        "--quality",
+        type=int,
+        default=72,
+        help="JPEG 압축 품질 0-100 (기본: 72)",
+    )
+    generate_parser.add_argument(
+        "--model",
+        type=str,
+        default="claude-opus-4-6",
+        help="Claude 모델 ID (기본: claude-opus-4-6)",
+    )
+    generate_parser.add_argument(
+        "--rounds",
+        type=int,
+        default=3,
+        metavar="N",
+        help="최대 LLM 교정 라운드 수 (기본: 3)",
+    )
+    generate_parser.add_argument(
+        "--answers",
+        type=Path,
+        default=None,
+        metavar="PDF",
+        help="답지/해설 PDF 경로 (있으면 문제지와 함께 LLM에 전달)",
+    )
+    generate_parser.add_argument(
+        "--no-build",
+        action="store_true",
+        help="PDF 빌드를 건너뜁니다 (YAML만 생성)",
+    )
+    generate_parser.add_argument(
+        "--expect",
+        type=str,
+        default=None,
+        metavar="SPEC",
+        help=(
+            "소문제 수 기대치. 형식: '문제ID:개수,...' "
+            "(예: '1:5,7:8'). 부족 시 LLM 재교정 요청."
+        ),
+    )
+
     preprocess_parser = subparsers.add_parser(
         "preprocess",
         help="PDF를 LLM 전달용으로 전처리합니다 (텍스트 추출 또는 이미지 압축).",
@@ -375,9 +445,43 @@ def _run_preprocess(
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except KeyboardInterrupt:
+        print("\n중단됨")
+        return 130
+
+
+def _main(argv: list[str] | None = None) -> int:
+    from dotenv import load_dotenv
+    load_dotenv()
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    if args.command == "generate":
+        from testmagick.generate import run_generate
+
+        expect_map: dict[str, int] | None = None
+        if args.expect:
+            try:
+                expect_map = _parse_expect(args.expect)
+            except ValueError as exc:
+                print(f"{_err_tag()} {exc}")
+                return 1
+
+        return run_generate(
+            pdf_path=args.input,
+            out_dir=args.out,
+            answers_pdf=args.answers,
+            method=args.method,
+            dpi=args.dpi,
+            quality=args.quality,
+            model=args.model,
+            max_rounds=args.rounds,
+            no_build=args.no_build,
+            expect_map=expect_map,
+        )
     if args.command == "validate":
         return _run_validate(input_path=args.input, expect=args.expect)
     if args.command == "build":

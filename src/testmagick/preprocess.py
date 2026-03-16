@@ -172,14 +172,32 @@ def _clean_text(text: str) -> str:
 
 # ─── 렌더링 헬퍼 ─────────────────────────────────────────────────────────────
 
+_MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MB (API 한도 5 MB에 여유)
+_MAX_IMAGE_PX = 7900               # API 한도 8000 px에 여유
+
+
 def _render_page(page: object, path: Path, dpi: int, quality: int) -> tuple[int, int]:
-    """페이지를 JPEG로 렌더링하고 (width, height)를 반환한다."""
+    """페이지를 JPEG로 렌더링하고 (width, height)를 반환한다.
+
+    픽셀 크기(8000px) 또는 파일 크기(5MB)를 초과하면 DPI를 낮춰 재렌더링한다.
+    """
     import fitz
-    scale = dpi / 72.0
-    mat = fitz.Matrix(scale, scale)
-    pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY)  # type: ignore[attr-defined]
-    path.write_bytes(pix.tobytes(output="jpg", jpg_quality=quality))
-    return pix.width, pix.height
+
+    cur_dpi = dpi
+    while True:
+        scale = cur_dpi / 72.0
+        mat = fitz.Matrix(scale, scale)
+        pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY)  # type: ignore[attr-defined]
+
+        if (pix.width > _MAX_IMAGE_PX or pix.height > _MAX_IMAGE_PX) and cur_dpi > 50:
+            cur_dpi = int(cur_dpi * 0.8)
+            continue
+
+        data = pix.tobytes(output="jpg", jpg_quality=quality)
+        if len(data) <= _MAX_IMAGE_BYTES or cur_dpi <= 50:
+            path.write_bytes(data)
+            return pix.width, pix.height
+        cur_dpi = int(cur_dpi * 0.8)
 
 
 # ─── 토큰 추정 ────────────────────────────────────────────────────────────────

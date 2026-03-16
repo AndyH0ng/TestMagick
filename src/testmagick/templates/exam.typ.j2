@@ -71,7 +71,7 @@
 {% for p in problems %}
 #block(
   width: 100%,
-  breakable: true,
+  breakable: false,
   above: {% if loop.first %}0pt{% else %}18pt{% endif %},
   below: 0pt,
 )[
@@ -91,7 +91,7 @@
 {% for sub in p.subproblems %}
   #block(
     width: 100%,
-    breakable: true,
+    breakable: false,
     above: {% if loop.first %}0pt{% else %}16pt{% endif %},
     below: 0pt,
   )[
@@ -100,7 +100,7 @@
         columns: (auto, 1fr),
         column-gutter: 6pt,
         align: top,
-        text(weight: "bold")[{{ sub.id | typst_string }}],
+        text(weight: "bold")[{% if sub.id.startswith('(') %}#{{ sub.id | typst_string }}{% else %}(#{{ sub.id | typst_string }}){% endif %}],
         [
 {% if sub.question_is_typst %}
 {{ sub.question_typst }}
@@ -124,7 +124,7 @@
           #v(6pt)
           #block(
             width: 100%,
-            height: 25pt,
+            height: 12pt,
             stroke: (bottom: 0.4pt + luma(200)),
           )[]
 {% endif %}
@@ -150,7 +150,7 @@
   #pad(left: 16pt)[
     #block(
       width: 100%,
-      height: 30pt,
+      height: 15pt,
       stroke: (bottom: 0.4pt + luma(200)),
     )[]
   ]

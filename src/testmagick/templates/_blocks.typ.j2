@@ -32,18 +32,69 @@
     align: center + horizon,
 {%- if block.headers %}
 {%- for h in block.headers %}
-    table.cell(fill: luma(230))[#text(weight: "bold")[#{{ h | typst_string }}]],
+    table.cell(fill: luma(230))[#text(weight: "bold")[{{ h | typst_cell }}]],
 {%- endfor %}
 {%- endif %}
 {%- for row in block.rows %}
 {%- for cell in row %}
-    [#{{ cell | typst_string }}],
+    [{{ cell | typst_cell }}],
 {%- endfor %}
 {%- endfor %}
   )
 ]
 #v(8pt)
 {%- endif %}
+{%- elif block.type == "mapping" %}
+#v(8pt)
+#align(center)[
+  #{
+    import "@preview/cetz:0.3.4": canvas, draw
+    canvas({
+      import draw: *
+      let _aw = (end: ">", fill: black, size: 0.2)
+      let _k = 0.5523
+      let _hw = {{ block.oval_hw }}
+      let _lhh = {{ block.left_hh }}
+      let _rhh = {{ block.right_hh }}
+      let _lcx = {{ block.left_cx }}
+      let _rcx = {{ block.right_cx }}
+      merge-path(close: true, fill: luma(245), stroke: 0.7pt + black, {
+        bezier((_lcx, _lhh), (_lcx + _hw, 0), (_lcx + _k * _hw, _lhh), (_lcx + _hw, _k * _lhh))
+        bezier((_lcx + _hw, 0), (_lcx, -_lhh), (_lcx + _hw, -_k * _lhh), (_lcx + _k * _hw, -_lhh))
+        bezier((_lcx, -_lhh), (_lcx - _hw, 0), (_lcx - _k * _hw, -_lhh), (_lcx - _hw, -_k * _lhh))
+        bezier((_lcx - _hw, 0), (_lcx, _lhh), (_lcx - _hw, _k * _lhh), (_lcx - _k * _hw, _lhh))
+      })
+      merge-path(close: true, fill: luma(245), stroke: 0.7pt + black, {
+        bezier((_rcx, _rhh), (_rcx + _hw, 0), (_rcx + _k * _hw, _rhh), (_rcx + _hw, _k * _rhh))
+        bezier((_rcx + _hw, 0), (_rcx, -_rhh), (_rcx + _hw, -_k * _rhh), (_rcx + _k * _hw, -_rhh))
+        bezier((_rcx, -_rhh), (_rcx - _hw, 0), (_rcx - _k * _hw, -_rhh), (_rcx - _hw, -_k * _rhh))
+        bezier((_rcx - _hw, 0), (_rcx, _rhh), (_rcx - _hw, _k * _rhh), (_rcx - _k * _hw, _rhh))
+      })
+{%- if block.from_label %}
+      content((_lcx, _lhh + 0.42), text(size: 10pt)[{{ block.from_label }}])
+{%- endif %}
+{%- if block.to_label %}
+      content((_rcx, _rhh + 0.42), text(size: 10pt)[{{ block.to_label }}])
+{%- endif %}
+
+{%- if block.arrow_label %}
+      let _ay = calc.max(_lhh, _rhh) + 0.4
+      line((_lcx + _hw + 0.15, _ay - 0.2), (_rcx - _hw - 0.15, _ay - 0.2), mark: _aw, stroke: 0.6pt)
+      content((0, _ay), text(size: 10pt)[{{ block.arrow_label }}])
+{%- endif %}
+{%- for n in block.left_nodes %}
+      content(({{ n.x }}, {{ n.y }}), text(size: 9pt)[{{ n.label }}], name: "_ln_{{ loop.index }}")
+{%- endfor %}
+{%- for n in block.right_nodes %}
+      content(({{ n.x }}, {{ n.y }}), text(size: 9pt)[{{ n.label }}], name: "_rn_{{ loop.index }}")
+{%- endfor %}
+{%- for e in block.edges %}
+      line("_ln_{{ e.left_idx }}.east", "_rn_{{ e.right_idx }}.west", mark: _aw, stroke: 0.6pt)
+{%- endfor %}
+    })
+  }
+]
+#v(8pt)
 {%- elif block.type == "graph" %}
 #v(8pt)
 #align(center)[
@@ -68,7 +119,17 @@
 {%- endfor %}
       )
 {%- for e in block.edges %}
-{%- if e.ctrl_pos %}
+{%- if e.is_self_loop %}
+      {
+        let _np = _p.at({{ e.from | typst_string }})
+        let _lw = 0.7
+        let _lh = 1.4
+        bezier((_np.at(0) - _r * 0.7, _np.at(1) + _r * 0.7), (_np.at(0) + _r * 0.7, _np.at(1) + _r * 0.7), (_np.at(0) - _lw, _np.at(1) + _lh), (_np.at(0) + _lw, _np.at(1) + _lh), mark: {% if e.directed %}_aw{% endif %})
+{%- if e.label %}
+        content((_np.at(0), _np.at(1) + _lh + 0.2), box(fill: white, inset: 2pt)[#text(size: 8pt)[{{ e.label }}]])
+{%- endif %}
+      }
+{%- elif e.ctrl_pos %}
       let _c1_{{ loop.index }} = ({{ e.ctrl_pos[0][0] }}, {{ e.ctrl_pos[0][1] }})
       let _c2_{{ loop.index }} = ({{ e.ctrl_pos[1][0] }}, {{ e.ctrl_pos[1][1] }})
       bezier(_ef(_p.at({{ e.from | typst_string }}), _c1_{{ loop.index }}), _ef(_p.at({{ e.to | typst_string }}), _c2_{{ loop.index }}), _c1_{{ loop.index }}, _c2_{{ loop.index }}, mark: {% if e.bidirectional %}_baw{% elif e.directed %}_aw{% endif %})

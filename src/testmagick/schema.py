@@ -107,8 +107,76 @@ class GraphBlock(BaseModel):
         return self
 
 
+class MappingEdge(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_node: str = Field(alias="from", min_length=1)
+    to: str | list[str]  # 단일 노드 또는 복수 노드 (일대다)
+
+    @field_validator("from_node")
+    @classmethod
+    def _strip_from(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("MappingEdge의 from은 비워둘 수 없습니다.")
+        return cleaned
+
+    @field_validator("to")
+    @classmethod
+    def _strip_to(cls, value: str | list[str]) -> str | list[str]:
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned:
+                raise ValueError("MappingEdge의 to는 비워둘 수 없습니다.")
+            return cleaned
+        cleaned = [v.strip() for v in value if v and v.strip()]
+        if not cleaned:
+            raise ValueError("MappingEdge의 to 목록이 비어 있습니다.")
+        return cleaned
+
+
+class MappingSet(BaseModel):
+    label: str | None = None  # 집합 이름 (예: "X", "$A$")
+    nodes: list[str] = Field(min_length=1)
+
+    @field_validator("nodes")
+    @classmethod
+    def _strip_nodes(cls, value: list[str]) -> list[str]:
+        cleaned = [v.strip() for v in value if v and v.strip()]
+        if not cleaned:
+            raise ValueError("MappingSet의 nodes가 비어 있습니다.")
+        return cleaned
+
+
+class MappingBlock(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: Literal["mapping"] = "mapping"
+    arrow_label: str | None = None  # 함수 이름 (예: "f")
+    from_set: MappingSet = Field(alias="from")
+    to_set: MappingSet = Field(alias="to")
+    edges: list[MappingEdge] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_edges(self) -> MappingBlock:
+        from_ids = set(self.from_set.nodes)
+        to_ids = set(self.to_set.nodes)
+        for edge in self.edges:
+            if edge.from_node not in from_ids:
+                raise ValueError(
+                    f"MappingEdge의 from '{edge.from_node}'이 from_set.nodes에 없습니다."
+                )
+            targets = edge.to if isinstance(edge.to, list) else [edge.to]
+            for t in targets:
+                if t not in to_ids:
+                    raise ValueError(
+                        f"MappingEdge의 to '{t}'이 to_set.nodes에 없습니다."
+                    )
+        return self
+
+
 QuestionBlock = Annotated[
-    Union[TextBlock, TypstBlock, FormulaBlock, RequirementsBlock, TableBlock, GraphBlock],
+    Union[TextBlock, TypstBlock, FormulaBlock, RequirementsBlock, TableBlock, GraphBlock, MappingBlock],
     Field(discriminator="type"),
 ]
 

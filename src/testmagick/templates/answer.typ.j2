@@ -77,7 +77,7 @@
 {% for p in problems %}
 #block(
   width: 100%,
-  breakable: true,
+  breakable: false,
   above: {% if loop.first %}0pt{% else %}14pt{% endif %},
   below: 0pt,
 )[
@@ -106,7 +106,7 @@
       columns: (auto, 1fr, auto),
       column-gutter: 6pt,
       align: top,
-      text(weight: "bold")[{{ sub.id | typst_string }}],
+      text(weight: "bold")[{% if sub.id.startswith('(') %}#{{ sub.id | typst_string }}{% else %}(#{{ sub.id | typst_string }}){% endif %}],
       [
 {% if sub.answer_is_typst %}
 {{ sub.answer_text }}
