@@ -7,6 +7,7 @@ from pathlib import Path
 
 from testmagick.builder import BuildError, build_exam
 from testmagick.io import InputLoadError, load_exam
+from testmagick.schema import Section
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -254,18 +255,25 @@ def _run_validate(input_path: Path, expect: str | None = None) -> int:
         print(f"{_err_tag()} {exc}")
         return 1
 
-    problems = exam_set.problems
-    total_sub = sum(len(p.subproblems) for p in problems if p.subproblems)
+    # Flatten problems from sections for counting and display
+    all_problems = []
+    for item in exam_set.problems:
+        if isinstance(item, Section):
+            all_problems.extend(item.problems)
+        else:
+            all_problems.append(item)
+
+    total_sub = sum(len(p.subproblems) for p in all_problems if p.subproblems)
     total_pts = sum(
         sum(s.points for s in p.subproblems) if p.subproblems else p.points
-        for p in problems
+        for p in all_problems
     )
 
     print(f"{_ok_tag()} 검증 완료: {_color(str(input_path), '36')}")
     print()
 
-    col_n   = max(len(str(len(problems))), 1)
-    col_id  = max((len(p.id) for p in problems), default=2)
+    col_n   = max(len(str(len(all_problems))), 1)
+    col_id  = max((len(p.id) for p in all_problems), default=2)
     col_pts = 6
 
     header = (
@@ -277,21 +285,33 @@ def _run_validate(input_path: Path, expect: str | None = None) -> int:
     print(_color(header, "2"))
     print(_color("  " + "─" * (len(header) - 2), "2"))
 
-    for i, p in enumerate(problems, 1):
-        if p.subproblems:
-            pts = sum(s.points for s in p.subproblems)
-            sub_ids = " ".join(s.id for s in p.subproblems)
-            sub_summary = f"{len(p.subproblems)}개  {_color(sub_ids, '2')}"
-        else:
-            pts = p.points
-            sub_summary = _color("─", "2")
+    def _sub_ids_str(subs: list) -> str:
+        return " ".join(s.id for s in subs)
 
-        pts_str = f"{pts:.1f}pt"
-        print(f"  {i:>{col_n}}  {p.id:<{col_id}}  {pts_str:>{col_pts}}  {sub_summary}")
+    num = 0
+    for item in exam_set.problems:
+        if isinstance(item, Section):
+            section_header = item.title_typst or item.title or "(섹션)"
+            print(_color(f"  ── [섹션] {section_header} ──", "2"))
+            probs = item.problems
+        else:
+            probs = [item]
+        for p in probs:
+            num += 1
+            if p.subproblems:
+                pts = sum(s.points for s in p.subproblems)
+                sub_ids = _sub_ids_str(p.subproblems)
+                sub_summary = f"{len(p.subproblems)}개  {_color(sub_ids, '2')}"
+            else:
+                pts = p.points
+                sub_summary = _color("─", "2")
+
+            pts_str = f"{pts:.1f}pt"
+            print(f"  {num:>{col_n}}  {p.id:<{col_id}}  {pts_str:>{col_pts}}  {sub_summary}")
 
     print()
     parts = [
-        f"문제 {len(problems)}개",
+        f"문제 {len(all_problems)}개",
         f"소문제 {total_sub}개" if total_sub else None,
         f"총 {total_pts:.1f}pt",
     ]
@@ -307,7 +327,7 @@ def _run_validate(input_path: Path, expect: str | None = None) -> int:
         print(f"{_err_tag()} {exc}")
         return 1
 
-    actual_map = {p.id: len(p.subproblems or []) for p in problems}
+    actual_map = {p.id: len(p.subproblems or []) for p in all_problems}
     issues: list[tuple[str, int, int]] = []
     for pid, exp_count in expected_map.items():
         act_count = actual_map.get(pid, 0)

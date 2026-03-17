@@ -11,7 +11,6 @@ from rich.console import Console
 from rich.live import Live
 from rich.markup import escape
 from rich.panel import Panel
-from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
@@ -79,6 +78,11 @@ _REQUEST_PROMPT = """\
 - question 필드에는 수식이 전혀 없는 순수 텍스트만 사용
 - 문장 중간에 수식이 한 글자라도 있으면 question_typst 사용, 인라인 수식은 $...$
 - choices/answer도 동일: 수식 포함 시 choices_typst / answer_typst 사용
+- 소문제 id에 부모 문제 번호를 포함하지 말 것: "10a"가 아닌 "a", "(1)", "가" 등 사용
+- 공통 지문/제시문이 있는 문제 묶음은 반드시 kind: section으로 묶을 것
+  (예: "다음 행렬 A~H를 이용하여 3~8번 물음에 답하라" → section으로 묶고 제시문은 content_blocks에)
+- Typst에서 ~는 non-breaking space임. 물결표(~) 문자를 title_typst 등에 쓸 때는 \\~로 이스케이프하고 YAML 싱글쿼트로 감쌀 것
+  (예: title_typst: '※ [3\\~8번] ...')
 - 완전한 YAML만 출력. 반드시 ```yaml 블록으로 감싸서 출력.
 """
 
@@ -164,6 +168,35 @@ def _extract_yaml(response: str) -> str | None:
     return None
 
 
+def _normalize_sub_ids(yaml_text: str) -> str:
+    """소문제 ID에서 부모 문제 번호 prefix 제거 (예: "10a" → "a", "5-1" → "1")."""
+    import yaml as _yaml
+
+    try:
+        data = _yaml.safe_load(yaml_text)
+    except Exception:
+        return yaml_text
+
+    def _fix(problems: list) -> None:
+        for item in problems:
+            if not isinstance(item, dict):
+                continue
+            if item.get("kind") == "section":
+                _fix(item.get("problems") or [])
+                continue
+            pid = str(item.get("id", ""))
+            subs = item.get("subproblems") or []
+            for sub in subs:
+                sid = str(sub.get("id", ""))
+                if sid.startswith(pid) and len(sid) > len(pid):
+                    remainder = sid[len(pid):]
+                    # strip separators like '-', '_', '.'
+                    sub["id"] = remainder.lstrip("-_.")
+
+    _fix(data.get("problems") or [])
+    return _yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+
 def _validate_text(yaml_text: str, path: Path):
     from testmagick.io import InputLoadError, load_exam
 
@@ -175,7 +208,12 @@ def _validate_text(yaml_text: str, path: Path):
 
 
 def _check_expect(exam, expect_map: dict[str, int]) -> list[tuple[str, int, int]]:
-    actual = {p.id: len(p.subproblems or []) for p in exam.problems}
+    from testmagick.schema import Section
+    actual = {}
+    for item in exam.problems:
+        probs = item.problems if isinstance(item, Section) else [item]
+        for p in probs:
+            actual[p.id] = len(p.subproblems or [])
     return [
         (pid, exp, actual.get(pid, 0))
         for pid, exp in expect_map.items()
@@ -238,7 +276,9 @@ def run_generate(
     # ── 전처리 ────────────────────────────────────────────────────────────────
     try:
         with console.status("문제지 전처리 중...", spinner="dots"):
-            prep = preprocess_pdf(pdf_path, out_dir / "prep", method=method, dpi=dpi, quality=quality)
+            prep = preprocess_pdf(
+                pdf_path, out_dir / "prep", method=method, dpi=dpi, quality=quality
+            )
     except ImportError as exc:
         _err("전처리", f"의존성 오류: {exc}")
         return 1
@@ -256,7 +296,10 @@ def run_generate(
     if answers_pdf:
         try:
             with console.status("답지 전처리 중...", spinner="dots"):
-                ans_prep = preprocess_pdf(answers_pdf, out_dir / "prep_answers", method=method, dpi=dpi, quality=quality)
+                ans_prep = preprocess_pdf(
+                    answers_pdf, out_dir / "prep_answers",
+                    method=method, dpi=dpi, quality=quality,
+                )
         except Exception as exc:
             _err("답지 전처리", str(exc))
             return 1
@@ -292,7 +335,7 @@ def run_generate(
         try:
             with client.messages.stream(
                 model=model,
-                max_tokens=8192,
+                max_tokens=16000,
                 system=system_prompt,
                 messages=messages,
             ) as stream:
@@ -327,10 +370,14 @@ def run_generate(
             if rnd < max_rounds:
                 messages += [
                     {"role": "assistant", "content": response_text},
-                    {"role": "user", "content": "응답에서 YAML 블록을 찾을 수 없습니다. 반드시 ```yaml 블록으로 감싸서 완전한 YAML만 다시 출력해주세요."},
+                    {"role": "user", "content": (
+                        "응답에서 YAML 블록을 찾을 수 없습니다. "
+                        "반드시 ```yaml 블록으로 감싸서 완전한 YAML만 다시 출력해주세요."
+                    )},
                 ]
             continue
 
+        yaml_text = _normalize_sub_ids(yaml_text)
         _ok("YAML 추출", f"{len(yaml_text):,}자")
         (out_dir / f"round_{rnd}.yaml").write_text(yaml_text, encoding="utf-8")
 

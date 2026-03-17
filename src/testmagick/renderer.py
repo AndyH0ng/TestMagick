@@ -12,10 +12,12 @@ from testmagick.schema import (
     ExamSet,
     FormulaBlock,
     GraphBlock,
+    ImageBlock,
     MappingBlock,
     Problem,
     QuestionBlock,
     RequirementsBlock,
+    Section,
     SubProblem,
     TableBlock,
     TypstBlock,
@@ -50,7 +52,8 @@ def _fix_latex_braces(math: str) -> str:
 
 
 def typst_cell(value: str) -> str:
-    """Typst content block [...] 안에서 사용. $...$ 또는 #으로 시작하면 raw, 아니면 #"..." 이스케이프."""
+    """Typst content block [...] 안에서 사용.
+    $...$ 또는 #으로 시작하면 raw, 아니면 #"..." 이스케이프."""
     s = value.strip()
     if s.startswith("$") and s.endswith("$") and len(s) > 2:
         return _fix_latex_braces(s)
@@ -113,7 +116,6 @@ def _mapping_payload(block: MappingBlock) -> dict[str, Any]:
         if edge.from_node not in from_idx:
             continue
         fi = from_idx[edge.from_node]
-        fy = left_ys[fi]
         targets = edge.to if isinstance(edge.to, list) else [edge.to]
         for t in targets:
             if t not in to_idx:
@@ -161,6 +163,8 @@ def _block_payload(block: QuestionBlock) -> dict[str, Any]:
         return {"type": "requirements", "content": block.content}
     if isinstance(block, TypstBlock):
         return {"type": "typst", "content": block.content}
+    if isinstance(block, ImageBlock):
+        return {"type": "image", "src": block.src, "width": block.width, "align": block.align}
     if isinstance(block, MappingBlock):
         return _mapping_payload(block)
     if isinstance(block, GraphBlock):
@@ -308,6 +312,28 @@ def _problem_payload(problem: Problem) -> ProblemPayload:
     }
 
 
+
+def _flat_problems(exam_set: ExamSet) -> list[Problem]:
+    result = []
+    for item in exam_set.problems:
+        if isinstance(item, Section):
+            result.extend(item.problems)
+        else:
+            result.append(item)
+    return result
+
+
+def _section_payload(section: Section) -> dict[str, Any]:
+    return {
+        "kind": "section",
+        "title": section.title or "",
+        "title_typst": section.title_typst or "",
+        "title_is_typst": bool(section.title_typst),
+        "content_blocks": [_block_payload(b) for b in (section.content_blocks or [])],
+        "problems": [_problem_payload(p) for p in section.problems],
+    }
+
+
 def _create_environment() -> Environment:
     env = Environment(
         loader=PackageLoader("testmagick", "templates"),
@@ -321,18 +347,47 @@ def _create_environment() -> Environment:
     return env
 
 
+def _resolve_image_paths(items: list[dict], yaml_dir: Path) -> None:
+    """block payload 안의 image.src를 절대경로로 변환한다."""
+    for item in items:
+        blocks = item.get("question_blocks") or []
+        blocks += item.get("content_blocks") or []
+        for sub in item.get("subproblems") or []:
+            blocks += sub.get("question_blocks") or []
+        for b in blocks:
+            if b.get("type") == "image":
+                p = Path(b["src"])
+                if not p.is_absolute():
+                    b["src"] = str((yaml_dir / p).resolve())
+        for sub_item in item.get("problems") or []:
+            _resolve_image_paths([sub_item], yaml_dir)
+
+
 def render_typst_files(
     exam_set: ExamSet,
     out_dir: Path,
     title_override: str | None = None,
+    yaml_path: Path | None = None,
 ) -> RenderedFiles:
     out_dir.mkdir(parents=True, exist_ok=True)
     env = _create_environment()
+
+    items = []
+    for item in exam_set.problems:
+        if isinstance(item, Section):
+            items.append(_section_payload(item))
+        else:
+            items.append(_problem_payload(item))
+
+    if yaml_path is not None:
+        _resolve_image_paths(items, yaml_path.parent)
+
     payload = {
         "title": title_override or exam_set.title,
         "course": exam_set.course,
         "date": exam_set.date,
-        "problems": [_problem_payload(p) for p in exam_set.problems],
+        "items": items,
+        "problems": [_problem_payload(p) for p in _flat_problems(exam_set)],
     }
 
     exam_typ_content = env.get_template("exam.typ.j2").render(**payload)

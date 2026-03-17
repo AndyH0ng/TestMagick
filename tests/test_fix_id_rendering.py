@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from testmagick.renderer import render_typst_files
 from testmagick.schema import ExamSet
 
