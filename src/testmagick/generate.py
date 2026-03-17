@@ -81,7 +81,8 @@ _REQUEST_PROMPT = """\
 - 소문제 id에 부모 문제 번호를 포함하지 말 것: "10a"가 아닌 "a", "(1)", "가" 등 사용
 - 공통 지문/제시문이 있는 문제 묶음은 반드시 kind: section으로 묶을 것
   (예: "다음 행렬 A~H를 이용하여 3~8번 물음에 답하라" → section으로 묶고 제시문은 content_blocks에)
-- Typst에서 ~는 non-breaking space임. 물결표(~) 문자를 title_typst 등에 쓸 때는 \\~로 이스케이프하고 YAML 싱글쿼트로 감쌀 것
+- Typst에서 ~는 non-breaking space임. 물결표(~) 문자를 title_typst 등에 쓸 때는
+  \\~로 이스케이프하고 YAML 싱글쿼트로 감쌀 것
   (예: title_typst: '※ [3\\~8번] ...')
 - 완전한 YAML만 출력. 반드시 ```yaml 블록으로 감싸서 출력.
 """

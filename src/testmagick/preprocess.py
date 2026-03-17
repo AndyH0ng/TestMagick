@@ -398,9 +398,11 @@ Problem과 동일 (id, type, question, question_typst, question_blocks, choices,
 
 ## Section (공통 지문 묶음)
 여러 문제가 같은 제시문·데이터를 공유할 때 사용한다.
-문제지에서 "다음 ○○를 이용하여 N~M번 물음에 답하라" 형태의 지문 박스가 있으면 반드시 section으로 묶어라.
+문제지에서 "다음 ○○를 이용하여 N~M번 물음에 답하라" 형태의 지문 박스가 있으면
+반드시 section으로 묶어라.
 
-**주의**: Typst에서 `~`는 non-breaking space로 처리된다. 물결표 문자(~)를 출력하려면 `\\~`로 이스케이프하고 YAML 싱글쿼트로 감싸야 한다.
+**주의**: Typst에서 `~`는 non-breaking space로 처리된다.
+물결표 문자(~)를 출력하려면 `\\~`로 이스케이프하고 YAML 싱글쿼트로 감싸야 한다.
 ```yaml
 - kind: section
   title_typst: '※ [3\\~8번] 다음 행렬 $A$\\~$H$를 이용하여 물음에 답하라.'

@@ -3,6 +3,7 @@ from pathlib import Path
 from testmagick.renderer import render_typst_files
 from testmagick.schema import ExamSet
 
+
 def test_render_subproblem_redundant_id_and_quotes(tmp_path: Path) -> None:
     exam = ExamSet.model_validate({
         "title": "SubRedundant",
