@@ -55,7 +55,9 @@ def build_exam(
 ) -> BuildArtifacts:
     ensure_typst_available()
     exam_set = load_exam(input_path)
-    rendered = render_typst_files(exam_set=exam_set, out_dir=out_dir, title_override=title_override)
+    rendered = render_typst_files(
+        exam_set=exam_set, out_dir=out_dir, title_override=title_override, yaml_path=input_path
+    )
 
     exam_pdf = out_dir / "exam.pdf"
     answer_pdf = out_dir / "answer.pdf"

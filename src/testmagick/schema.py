@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -107,8 +107,86 @@ class GraphBlock(BaseModel):
         return self
 
 
+class MappingEdge(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_node: str = Field(alias="from", min_length=1)
+    to: str | list[str]  # 단일 노드 또는 복수 노드 (일대다)
+
+    @field_validator("from_node")
+    @classmethod
+    def _strip_from(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("MappingEdge의 from은 비워둘 수 없습니다.")
+        return cleaned
+
+    @field_validator("to")
+    @classmethod
+    def _strip_to(cls, value: str | list[str]) -> str | list[str]:
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned:
+                raise ValueError("MappingEdge의 to는 비워둘 수 없습니다.")
+            return cleaned
+        cleaned = [v.strip() for v in value if v and v.strip()]
+        if not cleaned:
+            raise ValueError("MappingEdge의 to 목록이 비어 있습니다.")
+        return cleaned
+
+
+class MappingSet(BaseModel):
+    label: str | None = None  # 집합 이름 (예: "X", "$A$")
+    nodes: list[str] = Field(min_length=1)
+
+    @field_validator("nodes")
+    @classmethod
+    def _strip_nodes(cls, value: list[str]) -> list[str]:
+        cleaned = [v.strip() for v in value if v and v.strip()]
+        if not cleaned:
+            raise ValueError("MappingSet의 nodes가 비어 있습니다.")
+        return cleaned
+
+
+class ImageBlock(BaseModel):
+    type: Literal["image"] = "image"
+    src: str                        # YAML 기준 상대경로 또는 절대경로 (빌드 시 절대경로로 변환)
+    width: str = "80%"              # Typst width 값 (예: "60%", "8cm")
+    align: str = "center"          # "left" | "center" | "right"
+
+
+class MappingBlock(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: Literal["mapping"] = "mapping"
+    arrow_label: str | None = None  # 함수 이름 (예: "f")
+    from_set: MappingSet = Field(alias="from")
+    to_set: MappingSet = Field(alias="to")
+    edges: list[MappingEdge] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_edges(self) -> MappingBlock:
+        from_ids = set(self.from_set.nodes)
+        to_ids = set(self.to_set.nodes)
+        for edge in self.edges:
+            if edge.from_node not in from_ids:
+                raise ValueError(
+                    f"MappingEdge의 from '{edge.from_node}'이 from_set.nodes에 없습니다."
+                )
+            targets = edge.to if isinstance(edge.to, list) else [edge.to]
+            for t in targets:
+                if t not in to_ids:
+                    raise ValueError(
+                        f"MappingEdge의 to '{t}'이 to_set.nodes에 없습니다."
+                    )
+        return self
+
+
 QuestionBlock = Annotated[
-    Union[TextBlock, TypstBlock, FormulaBlock, RequirementsBlock, TableBlock, GraphBlock],
+    Union[
+        TextBlock, TypstBlock, FormulaBlock, RequirementsBlock,
+        TableBlock, GraphBlock, MappingBlock, ImageBlock,
+    ],
     Field(discriminator="type"),
 ]
 
@@ -233,6 +311,7 @@ class SubProblem(BaseModel):
 # ─── Problem ──────────────────────────────────────────────────────────────────
 
 class Problem(BaseModel):
+    kind: Literal["problem"] = "problem"
     id: str = Field(min_length=1)
     type: QuestionType
     question: str | None = None
@@ -389,11 +468,42 @@ class Problem(BaseModel):
             return None
 
 
+# ─── Section ──────────────────────────────────────────────────────────────────
+
+class Section(BaseModel):
+    kind: Literal["section"] = "section"
+    title: str | None = None
+    title_typst: str | None = None
+    content_blocks: list[QuestionBlock] | None = None
+    problems: list[Problem] = Field(min_length=1)
+
+
+ExamSetItem = Annotated[
+    Union[Problem, Section],
+    Field(discriminator="kind"),
+]
+
+
 class ExamSet(BaseModel):
     title: str = "제목 없는 시험지"
     course: str | None = None
     date: str | None = None
-    problems: list[Problem] = Field(default_factory=list, min_length=1)
+    problems: list[ExamSetItem] = Field(default_factory=list, min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inject_kind(cls, data: Any) -> Any:
+        """YAML에 kind 필드가 없는 항목은 기본값 'problem'을 주입."""
+        if isinstance(data, dict):
+            raw_problems = data.get("problems", [])
+            if isinstance(raw_problems, list):
+                injected = []
+                for item in raw_problems:
+                    if isinstance(item, dict) and "kind" not in item:
+                        item = {**item, "kind": "problem"}
+                    injected.append(item)
+                data = {**data, "problems": injected}
+        return data
 
     @field_validator("title")
     @classmethod
@@ -415,10 +525,12 @@ class ExamSet(BaseModel):
     def _validate_unique_problem_ids(self) -> ExamSet:
         seen: set[str] = set()
         duplicates: set[str] = set()
-        for problem in self.problems:
-            if problem.id in seen:
-                duplicates.add(problem.id)
-            seen.add(problem.id)
+        for item in self.problems:
+            ids = [item.id] if isinstance(item, Problem) else [p.id for p in item.problems]
+            for pid in ids:
+                if pid in seen:
+                    duplicates.add(pid)
+                seen.add(pid)
         if duplicates:
             duplicate_text = ", ".join(sorted(duplicates))
             raise ValueError(f"중복된 문제 ID가 있습니다: {duplicate_text}")

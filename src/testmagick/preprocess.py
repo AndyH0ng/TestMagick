@@ -172,14 +172,32 @@ def _clean_text(text: str) -> str:
 
 # ─── 렌더링 헬퍼 ─────────────────────────────────────────────────────────────
 
+_MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MB (API 한도 5 MB에 여유)
+_MAX_IMAGE_PX = 7900               # API 한도 8000 px에 여유
+
+
 def _render_page(page: object, path: Path, dpi: int, quality: int) -> tuple[int, int]:
-    """페이지를 JPEG로 렌더링하고 (width, height)를 반환한다."""
+    """페이지를 JPEG로 렌더링하고 (width, height)를 반환한다.
+
+    픽셀 크기(8000px) 또는 파일 크기(5MB)를 초과하면 DPI를 낮춰 재렌더링한다.
+    """
     import fitz
-    scale = dpi / 72.0
-    mat = fitz.Matrix(scale, scale)
-    pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY)  # type: ignore[attr-defined]
-    path.write_bytes(pix.tobytes(output="jpg", jpg_quality=quality))
-    return pix.width, pix.height
+
+    cur_dpi = dpi
+    while True:
+        scale = cur_dpi / 72.0
+        mat = fitz.Matrix(scale, scale)
+        pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY)  # type: ignore[attr-defined]
+
+        if (pix.width > _MAX_IMAGE_PX or pix.height > _MAX_IMAGE_PX) and cur_dpi > 50:
+            cur_dpi = int(cur_dpi * 0.8)
+            continue
+
+        data = pix.tobytes(output="jpg", jpg_quality=quality)
+        if len(data) <= _MAX_IMAGE_BYTES or cur_dpi <= 50:
+            path.write_bytes(data)
+            return pix.width, pix.height
+        cur_dpi = int(cur_dpi * 0.8)
 
 
 # ─── 토큰 추정 ────────────────────────────────────────────────────────────────
@@ -305,6 +323,12 @@ problems:
     - ["2023", "1,800"]
 ```
 
+### text — 일반 텍스트 단락
+```yaml
+- type: text
+  content: "첫째항이 3이고 공비가 2인 등비수열이 있다."
+```
+
 ### requirements — 조건 박스
 ```yaml
 - type: requirements
@@ -346,9 +370,58 @@ question_typst: "$a_1 eq.not a_2$일 때, 유일해임을 보여라."
 question_typst: "다항식 $p(x) = a_0 + a_1 x + a_2 x^2$이 점 $(1, 3)$을 지날 때 $a_0$를 구하라."
 ```
 
+## MCQ answer_typst (객관식 해설)
+객관식에도 `answer_typst`로 해설을 작성할 수 있다. 선택지 번호(①②③…)는 유지된다.
+```yaml
+- id: "1"
+  type: mcq
+  question: "다음 중 참인 것은?"
+  choices: ["참", "거짓"]
+  answer: 1
+  answer_typst: |
+    ① 참이다. $x = 0$일 때 성립한다.
+```
+
+## choices_typst (수식 선택지)
+선택지에 수식이 포함될 경우 `choices_typst`를 사용한다.
+```yaml
+choices_typst:
+  - "$x = 1, 2$"
+  - "$x = 2, 3$"
+  - "$x = -2, -3$"
+answer: 2
+```
+
 ## subproblem 필드
 Problem과 동일 (id, type, question, question_typst, question_blocks, choices, answer, points).
 단, subproblems 중첩 불가.
+
+## Section (공통 지문 묶음)
+여러 문제가 같은 제시문·데이터를 공유할 때 사용한다.
+문제지에서 "다음 ○○를 이용하여 N~M번 물음에 답하라" 형태의 지문 박스가 있으면
+반드시 section으로 묶어라.
+
+**주의**: Typst에서 `~`는 non-breaking space로 처리된다.
+물결표 문자(~)를 출력하려면 `\\~`로 이스케이프하고 YAML 싱글쿼트로 감싸야 한다.
+```yaml
+- kind: section
+  title_typst: '※ [3\\~8번] 다음 행렬 $A$\\~$H$를 이용하여 물음에 답하라.'
+  content_blocks:
+    - type: formula
+      content: "A = mat(delim: \"[\", 1, 2; 3, 4), quad B = mat(delim: \"[\", 5, 6; 7, 8)"
+  problems:
+    - id: "3"
+      type: short
+      question: "각 행렬의 크기를 구하라."
+      answer_typst: "..."
+    - id: "4"
+      ...
+```
+- `title_typst`: 섹션 제목 (Typst 수식 포함 가능)
+- `content_blocks`: 공통 제시문 블록 (formula / table / typst 등)
+- `problems`: 섹션 안의 문제 목록 (Problem과 동일 구조, kind 필드 없음)
+- section 안 문제에는 제시문을 반복하지 말 것 (content_blocks에 한 번만 작성)
+
 
 ## 자주 쓰는 Typst 수식
 | 내용 | Typst |
@@ -392,12 +465,18 @@ _PROMPT_HINT = """\
 - 독립 줄 수식(가운데 정렬)은 question_blocks의 formula 타입으로 ($ 없이 Typst 수식 문법)
 - 행렬은 mat(delim: "[", ...) 사용, 첨가행렬은 augment: #N 파라미터
 - 소문제가 있으면 반드시 subproblems 배열로
+- 소문제 id에 부모 문제 번호를 포함하지 말 것: "10a"가 아닌 "a", "(1)", "가" 등 사용
 - 풀이/해설은 answer_typst에 Typst 마크업으로 작성
 - question 필드에는 수식이 전혀 없는 순수 텍스트만 사용
 - 문장 중간에 수식이 한 글자라도 있으면 반드시 question_typst 사용,
   인라인 수식은 $...$로 감쌀 것
   예) question_typst: "$a_1 eq.not a_2$일 때, 유일해임을 보여라."
 - choices/answer도 동일: 수식 포함 시 choices_typst, answer_typst 사용
+- 공통 지문/제시문이 있는 문제 묶음은 반드시 kind: section으로 묶을 것
+  (예: "다음 행렬 A~H를 이용하여 3~8번 물음에 답하라" → section으로 묶고 제시문은 content_blocks에)
+- Typst에서 ~는 non-breaking space임. 물결표 문자는 \\~로 이스케이프하고 YAML 싱글쿼트로 감쌀 것
+  예) title_typst: '※ [3\\~8번] 다음 행렬 $A$\\~$H$를 이용하여 물음에 답하라.'
+- 완전한 YAML만 출력. 반드시 ```yaml 블록으로 감싸서 출력.
 ```
 """
 

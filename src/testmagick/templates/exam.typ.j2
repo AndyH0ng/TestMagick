@@ -3,10 +3,6 @@
 #set page(
   paper: "a4",
   margin: (top: 25mm, bottom: 22mm, left: 25mm, right: 25mm),
-  footer: context {
-    set text(size: 8.5pt, fill: luma(140))
-    align(center)[Page #counter(page).display() of #counter(page).final().first()]
-  },
 )
 
 #set text(
@@ -68,40 +64,37 @@
 #v(16pt)
 
 // ─── Problems ───
-{% for p in problems %}
+{% macro render_problem(p, num) %}
 #block(
   width: 100%,
-  breakable: true,
-  above: {% if loop.first %}0pt{% else %}18pt{% endif %},
+  breakable: {% if p.has_subproblems %}true{% else %}false{% endif %},
+  above: {% if num == 1 %}0pt{% else %}18pt{% endif %},
   below: 0pt,
 )[
-  #text(weight: "bold", size: 11pt)[{{ loop.index }}.] #h(2pt)
-  #text(size: 9.5pt)[\({{ "%.1f"|format(p.points) }} pts\)]
-  #v(3pt)
-{% if p.question_is_typst %}
-{{ p.question_typst }}
-{% elif p.question %}
-#{{ p.question | typst_string }}
-{% endif %}
+  #grid(
+    columns: (auto, 1fr),
+    column-gutter: 4pt,
+    align: top,
+    [#text(weight: "bold", size: 11pt)[{{ num }}.]],
+    [{% if p.question_is_typst %}{{ p.question_typst | trim }}{% elif p.question %}#{{ p.question | typst_string }}{% endif %}
 {% if p.question_blocks %}
 {{ render_blocks(p.question_blocks) }}
 {% endif %}
 {% if p.has_subproblems %}
-  #v(16pt)
+#v(10pt)
 {% for sub in p.subproblems %}
-  #block(
-    width: 100%,
-    breakable: true,
-    above: {% if loop.first %}0pt{% else %}16pt{% endif %},
-    below: 0pt,
-  )[
-    #pad(left: 16pt)[
-      #grid(
-        columns: (auto, 1fr),
-        column-gutter: 6pt,
-        align: top,
-        text(weight: "bold")[{{ sub.id | typst_string }}],
-        [
+#block(
+  width: 100%,
+  breakable: false,
+  above: {% if loop.first %}0pt{% else %}14pt{% endif %},
+  below: 0pt,
+)[
+  #grid(
+    columns: (auto, 1fr),
+    column-gutter: 6pt,
+    align: top,
+    text(weight: "bold")[{% if sub.id.startswith('(') %}#{{ sub.id | typst_string }}{% else %}(#{{ sub.id | typst_string }}){% endif %}],
+    [
 {% if sub.question_is_typst %}
 {{ sub.question_typst }}
 {% elif sub.question %}
@@ -111,49 +104,74 @@
 {{ render_blocks(sub.question_blocks) }}
 {% endif %}
 {% if sub.type == "mcq" %}
-          #v(4pt)
-          #pad(left: 8pt)[
+#v(4pt)
+#pad(left: 8pt)[
 {% for choice in sub.choices %}
-            #block(spacing: 5pt)[{{ choice.label }} #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
+#block(spacing: 5pt)[{{ choice.label }} #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
 {% if not loop.last %}
-            #v(2pt)
+#v(2pt)
 {% endif %}
 {% endfor %}
-          ]
+]
 {% else %}
-          #v(6pt)
-          #block(
-            width: 100%,
-            height: 25pt,
-            stroke: (bottom: 0.4pt + luma(200)),
-          )[]
+#v(6pt)
+#block(
+  width: 100%,
+  height: 12pt,
+  stroke: (bottom: 0.4pt + luma(200)),
+)[]
 {% endif %}
-        ],
-      )
-    ]
-  ]
+    ],
+  )
+]
 {% endfor %}
 {% elif p.type == "mcq" %}
-
-  #v(7pt)
-  #pad(left: 16pt)[
+#v(7pt)
 {% for choice in p.choices %}
-    #block(spacing: 7pt)[{{ choice.label }} #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
+#block(spacing: 7pt)[{{ choice.label }} #h(4pt) {% if choice.is_typst %}{{ choice.value }}{% else %}#{{ choice.value | typst_string }}{% endif %}]
 {% if not loop.last %}
-    #v(4pt)
+#v(4pt)
 {% endif %}
 {% endfor %}
-  ]
 {% else %}
-
-  #v(8pt)
-  #pad(left: 16pt)[
-    #block(
-      width: 100%,
-      height: 30pt,
-      stroke: (bottom: 0.4pt + luma(200)),
-    )[]
-  ]
+#v(8pt)
+#block(
+  width: 100%,
+  height: 15pt,
+  stroke: (bottom: 0.4pt + luma(200)),
+)[]
+{% endif %}
+    ],
+  )
+]
+{% endmacro %}
+{% set ns = namespace(num=0) %}
+{% for item in items %}
+{% if item.kind == "section" %}
+#v(14pt)
+#block(
+  width: 100%,
+  inset: (x: 10pt, y: 7pt),
+  stroke: 0.4pt + luma(160),
+  fill: luma(252),
+)[
+  #set text(size: 10pt)
+{% if item.title_is_typst %}
+  {{ item.title_typst }}
+{% elif item.title %}
+  #{{ item.title | typst_string }}
+{% endif %}
+{% if item.content_blocks %}
+{{ render_blocks(item.content_blocks) }}
 {% endif %}
 ]
+#v(4pt)
+{% for p in item.problems %}
+{% set ns.num = ns.num + 1 %}
+{{ render_problem(p, ns.num) }}
+{% endfor %}
+{% else %}
+{% set ns.num = ns.num + 1 %}
+{{ render_problem(item, ns.num) }}
+{% endif %}
 {% endfor %}

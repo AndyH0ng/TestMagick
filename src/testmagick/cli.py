@@ -7,6 +7,7 @@ from pathlib import Path
 
 from testmagick.builder import BuildError, build_exam
 from testmagick.io import InputLoadError, load_exam
+from testmagick.schema import Section
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -60,6 +61,76 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-zip",
         action="store_true",
         help="package.zip 생성을 비활성화합니다.",
+    )
+
+    generate_parser = subparsers.add_parser(
+        "generate",
+        help="PDF에서 YAML을 자동 생성하고 PDF를 빌드합니다 (LLM 피드백 루프).",
+    )
+    generate_parser.add_argument(
+        "--input",
+        required=True,
+        type=Path,
+        help="입력 PDF 파일 경로",
+    )
+    generate_parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("out"),
+        help="출력 디렉터리 (기본: out)",
+    )
+    generate_parser.add_argument(
+        "--method",
+        choices=["auto", "mixed", "text", "images", "markdown"],
+        default="auto",
+        help="전처리 방식 (기본: auto)",
+    )
+    generate_parser.add_argument(
+        "--dpi",
+        type=int,
+        default=150,
+        help="이미지 모드 해상도 (기본: 150)",
+    )
+    generate_parser.add_argument(
+        "--quality",
+        type=int,
+        default=72,
+        help="JPEG 압축 품질 0-100 (기본: 72)",
+    )
+    generate_parser.add_argument(
+        "--model",
+        type=str,
+        default="claude-opus-4-6",
+        help="Claude 모델 ID (기본: claude-opus-4-6)",
+    )
+    generate_parser.add_argument(
+        "--rounds",
+        type=int,
+        default=3,
+        metavar="N",
+        help="최대 LLM 교정 라운드 수 (기본: 3)",
+    )
+    generate_parser.add_argument(
+        "--answers",
+        type=Path,
+        default=None,
+        metavar="PDF",
+        help="답지/해설 PDF 경로 (있으면 문제지와 함께 LLM에 전달)",
+    )
+    generate_parser.add_argument(
+        "--no-build",
+        action="store_true",
+        help="PDF 빌드를 건너뜁니다 (YAML만 생성)",
+    )
+    generate_parser.add_argument(
+        "--expect",
+        type=str,
+        default=None,
+        metavar="SPEC",
+        help=(
+            "소문제 수 기대치. 형식: '문제ID:개수,...' "
+            "(예: '1:5,7:8'). 부족 시 LLM 재교정 요청."
+        ),
     )
 
     preprocess_parser = subparsers.add_parser(
@@ -184,18 +255,25 @@ def _run_validate(input_path: Path, expect: str | None = None) -> int:
         print(f"{_err_tag()} {exc}")
         return 1
 
-    problems = exam_set.problems
-    total_sub = sum(len(p.subproblems) for p in problems if p.subproblems)
+    # Flatten problems from sections for counting and display
+    all_problems = []
+    for item in exam_set.problems:
+        if isinstance(item, Section):
+            all_problems.extend(item.problems)
+        else:
+            all_problems.append(item)
+
+    total_sub = sum(len(p.subproblems) for p in all_problems if p.subproblems)
     total_pts = sum(
         sum(s.points for s in p.subproblems) if p.subproblems else p.points
-        for p in problems
+        for p in all_problems
     )
 
     print(f"{_ok_tag()} 검증 완료: {_color(str(input_path), '36')}")
     print()
 
-    col_n   = max(len(str(len(problems))), 1)
-    col_id  = max((len(p.id) for p in problems), default=2)
+    col_n   = max(len(str(len(all_problems))), 1)
+    col_id  = max((len(p.id) for p in all_problems), default=2)
     col_pts = 6
 
     header = (
@@ -207,21 +285,33 @@ def _run_validate(input_path: Path, expect: str | None = None) -> int:
     print(_color(header, "2"))
     print(_color("  " + "─" * (len(header) - 2), "2"))
 
-    for i, p in enumerate(problems, 1):
-        if p.subproblems:
-            pts = sum(s.points for s in p.subproblems)
-            sub_ids = " ".join(s.id for s in p.subproblems)
-            sub_summary = f"{len(p.subproblems)}개  {_color(sub_ids, '2')}"
-        else:
-            pts = p.points
-            sub_summary = _color("─", "2")
+    def _sub_ids_str(subs: list) -> str:
+        return " ".join(s.id for s in subs)
 
-        pts_str = f"{pts:.1f}pt"
-        print(f"  {i:>{col_n}}  {p.id:<{col_id}}  {pts_str:>{col_pts}}  {sub_summary}")
+    num = 0
+    for item in exam_set.problems:
+        if isinstance(item, Section):
+            section_header = item.title_typst or item.title or "(섹션)"
+            print(_color(f"  ── [섹션] {section_header} ──", "2"))
+            probs = item.problems
+        else:
+            probs = [item]
+        for p in probs:
+            num += 1
+            if p.subproblems:
+                pts = sum(s.points for s in p.subproblems)
+                sub_ids = _sub_ids_str(p.subproblems)
+                sub_summary = f"{len(p.subproblems)}개  {_color(sub_ids, '2')}"
+            else:
+                pts = p.points
+                sub_summary = _color("─", "2")
+
+            pts_str = f"{pts:.1f}pt"
+            print(f"  {num:>{col_n}}  {p.id:<{col_id}}  {pts_str:>{col_pts}}  {sub_summary}")
 
     print()
     parts = [
-        f"문제 {len(problems)}개",
+        f"문제 {len(all_problems)}개",
         f"소문제 {total_sub}개" if total_sub else None,
         f"총 {total_pts:.1f}pt",
     ]
@@ -237,7 +327,7 @@ def _run_validate(input_path: Path, expect: str | None = None) -> int:
         print(f"{_err_tag()} {exc}")
         return 1
 
-    actual_map = {p.id: len(p.subproblems or []) for p in problems}
+    actual_map = {p.id: len(p.subproblems or []) for p in all_problems}
     issues: list[tuple[str, int, int]] = []
     for pid, exp_count in expected_map.items():
         act_count = actual_map.get(pid, 0)
@@ -375,9 +465,43 @@ def _run_preprocess(
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except KeyboardInterrupt:
+        print("\n중단됨")
+        return 130
+
+
+def _main(argv: list[str] | None = None) -> int:
+    from dotenv import load_dotenv
+    load_dotenv()
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    if args.command == "generate":
+        from testmagick.generate import run_generate
+
+        expect_map: dict[str, int] | None = None
+        if args.expect:
+            try:
+                expect_map = _parse_expect(args.expect)
+            except ValueError as exc:
+                print(f"{_err_tag()} {exc}")
+                return 1
+
+        return run_generate(
+            pdf_path=args.input,
+            out_dir=args.out,
+            answers_pdf=args.answers,
+            method=args.method,
+            dpi=args.dpi,
+            quality=args.quality,
+            model=args.model,
+            max_rounds=args.rounds,
+            no_build=args.no_build,
+            expect_map=expect_map,
+        )
     if args.command == "validate":
         return _run_validate(input_path=args.input, expect=args.expect)
     if args.command == "build":

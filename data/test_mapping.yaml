@@ -1,0 +1,22 @@
+title: 매핑 테스트
+problems:
+  - id: Q1
+    type: short
+    question: 다음 대응을 보고 물음에 답하시오.
+    question_blocks:
+      - type: mapping
+        arrow_label: f
+        from:
+          label: X
+          nodes: ["1", "2", "3"]
+        to:
+          label: Y
+          nodes: ["a", "b", "c", "d"]
+        edges:
+          - from: "1"
+            to: "a"
+          - from: "2"
+            to: ["b", "c"]
+          - from: "3"
+            to: "d"
+    answer: 함수이다

@@ -2,10 +2,6 @@
 #set page(
   paper: "a4",
   margin: (top: 25mm, bottom: 22mm, left: 25mm, right: 25mm),
-  footer: context {
-    set text(size: 8.5pt, fill: luma(140))
-    align(center)[Page #counter(page).display() of #counter(page).final().first()]
-  },
 )
 
 #set text(
@@ -77,21 +73,21 @@
 {% for p in problems %}
 #block(
   width: 100%,
-  breakable: true,
+  breakable: {% if p.has_subproblems %}true{% else %}false{% endif %},
   above: {% if loop.first %}0pt{% else %}14pt{% endif %},
   below: 0pt,
 )[
   #grid(
     columns: (auto, 1fr, auto),
-    align: horizon,
-    text(weight: "bold", size: 11pt)[{{ loop.index }}.],
-    [],
-    text(size: 9.5pt, weight: "bold")[{% if p.has_subproblems %}소문제 포함{% else %}정답: {{ p.answer_label }}{% endif %}],
+    align: (left + top, left + top, right + top),
+    column-gutter: 4pt,
+    [#text(weight: "bold", size: 11pt)[{{ loop.index }}.]], [],
+    [#text(size: 9.5pt, weight: "bold")[{% if p.has_subproblems %}소문제 포함{% else %}정답: {{ p.answer_label }}{% endif %}]],
   )
 
   #v(4pt)
 {% if not p.has_subproblems %}
-  #pad(left: 16pt)[
+  #pad(left: 18pt)[
 {% if p.answer_is_typst %}
 {{ p.answer_text }}
 {% else %}
@@ -101,12 +97,12 @@
 {% else %}
 {% for sub in p.subproblems %}
   #v(6pt)
-  #pad(left: 16pt)[
+  #pad(left: 18pt)[
     #grid(
       columns: (auto, 1fr, auto),
       column-gutter: 6pt,
       align: top,
-      text(weight: "bold")[{{ sub.id | typst_string }}],
+      text(weight: "bold")[{% if sub.id.startswith('(') %}#{{ sub.id | typst_string }}{% else %}(#{{ sub.id | typst_string }}){% endif %}],
       [
 {% if sub.answer_is_typst %}
 {{ sub.answer_text }}
